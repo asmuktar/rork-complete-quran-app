@@ -35,26 +35,26 @@ export interface AudioPlayerActions {
 }
 
 const RECITERS = {
-  'almatroud': 'Almatroud_128kbps',
-  'mishary-alafasy': 'Alafasy_128kbps',
-  'abdur-rahman-sudais': 'Abdurrahman_As-Sudais_192kbps',
-  'maher-al-muaiqly': 'Maher_AlMuaiqly_128kbps',
-  'abdullah-basfar': 'Abdullah_Basfar_192kbps',
-  'saad-al-ghamdi': 'Saad_Al-Ghamdi_128kbps',
-  'ali-al-hudhaify': 'Ali_Al-Hudhaify_128kbps',
-  'abu-bakr-al-shatri': 'Abu_Bakr_al-Shatri_128kbps',
-  'ahmad-al-ajmi': 'Ahmad_Al-Ajmi_128kbps',
-  'mohamed-siddiq-al-minshawi': 'Minshawi_Mujawwad_128kbps',
-  'mohamed-al-tablawi': 'Tablawi_128kbps',
-  'aliyu-jabir': 'Aliyu_Jabir_128kbps',
-  'bandar-baleela': 'Bandar_Baleela_192kbps',
-  'yasser-al-dosari': 'Yasser_Al-Dosari_128kbps',
-  'khalid-al-jalil': 'Khalid_Al-Jalil_128kbps',
-  'nasser-al-qatami': 'Nasser_Al-Qatami_128kbps',
-  'fares-abbad': 'Fares_Abbad_128kbps',
-  'salah-al-budair': 'Salah_Al-Budair_128kbps',
-  'omar-al-kazabri': 'Omar_Al-Kazabri_128kbps',
-  'idris-abkar': 'Idris_Abkar_128kbps',
+  'almatroud': 'almatroud',
+  'mishary-alafasy': 'alafasy',
+  'abdur-rahman-sudais': 'sudais',
+  'maher-al-muaiqly': 'muaiqly',
+  'abdullah-basfar': 'basfar',
+  'saad-al-ghamdi': 'ghamdi',
+  'ali-al-hudhaify': 'hudhaify',
+  'abu-bakr-al-shatri': 'shatri',
+  'ahmad-al-ajmi': 'ajmi',
+  'mohamed-siddiq-al-minshawi': 'minshawi',
+  'mohamed-al-tablawi': 'tablawi',
+  'aliyu-jabir': 'jabir',
+  'bandar-baleela': 'baleela',
+  'yasser-al-dosari': 'dosari',
+  'khalid-al-jalil': 'jalil',
+  'nasser-al-qatami': 'qatami',
+  'fares-abbad': 'abbad',
+  'salah-al-budair': 'budair',
+  'omar-al-kazabri': 'kazabri',
+  'idris-abkar': 'abkar',
 };
 
 export function useAudioPlayer(): AudioPlayerState & AudioPlayerActions {
@@ -125,10 +125,12 @@ export function useAudioPlayer(): AudioPlayerState & AudioPlayerActions {
 
   const getAudioUrl = useCallback((surahNumber: number, ayahNumber: number): string => {
     // Use working audio URLs from EveryAyah.com
-    const reciterFolder = RECITERS[currentReciterRef.current as keyof typeof RECITERS] || 'Alafasy_128kbps';
+    const reciterFolder = RECITERS[currentReciterRef.current as keyof typeof RECITERS] || 'alafasy';
     const paddedSurah = surahNumber.toString().padStart(3, '0');
     const paddedAyah = ayahNumber.toString().padStart(3, '0');
-    return `https://everyayah.com/data/${reciterFolder}/${paddedSurah}${paddedAyah}.mp3`;
+    
+    // Use reliable audio source from Islamic Network
+    return `https://cdn.islamic.network/quran/audio/128/ar.${reciterFolder}/${paddedSurah}${paddedAyah}.mp3`;
   }, []);
   
 
@@ -141,11 +143,7 @@ export function useAudioPlayer(): AudioPlayerState & AudioPlayerActions {
     try {
       if (Platform.OS === 'web') {
         return new Promise((resolve, reject) => {
-          const audio = Platform.OS === 'web' ? new (window as any).Audio(url) : null;
-          if (!audio) {
-            reject(new Error('Audio not supported'));
-            return;
-          }
+          const audio = new (window as any).Audio(url) as HTMLAudioElement;
           webAudioRef.current = audio;
 
           audio.onloadeddata = () => {
@@ -166,6 +164,7 @@ export function useAudioPlayer(): AudioPlayerState & AudioPlayerActions {
           };
 
           audio.onerror = (error: any) => {
+            console.error('Audio error:', error);
             setState(prev => ({ 
               ...prev, 
               isLoading: false, 
@@ -175,7 +174,12 @@ export function useAudioPlayer(): AudioPlayerState & AudioPlayerActions {
             reject(error);
           };
 
-          audio.play().catch(reject);
+          // Set volume and play
+          audio.volume = 1.0;
+          audio.play().catch((playError: any) => {
+            console.error('Play error:', playError);
+            reject(playError);
+          });
         });
       } else {
         const { sound } = await Audio.Sound.createAsync(

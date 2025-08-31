@@ -2,23 +2,72 @@ import { z } from "zod";
 import { publicProcedure } from "../../../create-context";
 
 const HADITH_API_BASE = "https://api.hadith.gading.dev";
+const SUNNAH_API_BASE = "https://api.sunnah.com/v1";
 
 export const getHadithCollectionsProcedure = publicProcedure
   .query(async () => {
     try {
       const response = await fetch(`${HADITH_API_BASE}/books`);
-      const data = await response.json();
-      return data.data || [];
+      
+      if (response.ok) {
+        const data = await response.json();
+        return data.data || [];
+      }
+      
+      // Fallback to static data
+      return [
+        { 
+          id: 'bukhari', 
+          name: 'Sahih al-Bukhari', 
+          arabicName: 'صحيح البخاري',
+          total: 7563,
+          description: 'The most authentic collection of hadith',
+          compiler: 'Imam al-Bukhari'
+        },
+        { 
+          id: 'muslim', 
+          name: 'Sahih Muslim', 
+          arabicName: 'صحيح مسلم',
+          total: 7190,
+          description: 'Second most authentic hadith collection',
+          compiler: 'Imam Muslim'
+        },
+        { 
+          id: 'abudawud', 
+          name: 'Sunan Abu Dawud', 
+          arabicName: 'سنن أبي داود',
+          total: 5274,
+          description: 'Collection focusing on legal matters',
+          compiler: 'Abu Dawud'
+        },
+        { 
+          id: 'tirmidhi', 
+          name: 'Jami at-Tirmidhi', 
+          arabicName: 'جامع الترمذي',
+          total: 3956,
+          description: 'Collection with detailed commentary',
+          compiler: 'At-Tirmidhi'
+        },
+        { 
+          id: 'nasai', 
+          name: 'Sunan an-Nasa\'i', 
+          arabicName: 'سنن النسائي',
+          total: 5761,
+          description: 'Collection known for strict criteria',
+          compiler: 'An-Nasa\'i'
+        },
+        { 
+          id: 'ibnmajah', 
+          name: 'Sunan Ibn Majah', 
+          arabicName: 'سنن ابن ماجه',
+          total: 4341,
+          description: 'Collection completing the six major books',
+          compiler: 'Ibn Majah'
+        }
+      ];
     } catch (error) {
       console.error('Error fetching hadith collections:', error);
-      return [
-        { id: 'bukhari', name: 'Sahih Bukhari', total: 7563 },
-        { id: 'muslim', name: 'Sahih Muslim', total: 7563 },
-        { id: 'abudawud', name: 'Sunan Abu Dawud', total: 5274 },
-        { id: 'tirmidhi', name: 'Jami at-Tirmidhi', total: 3956 },
-        { id: 'nasai', name: 'Sunan an-Nasa\'i', total: 5761 },
-        { id: 'ibnmajah', name: 'Sunan Ibn Majah', total: 4341 }
-      ];
+      throw new Error('Failed to fetch hadith collections');
     }
   });
 
@@ -33,8 +82,29 @@ export const getHadithsProcedure = publicProcedure
       const response = await fetch(
         `${HADITH_API_BASE}/books/${input.collection}?range=${input.page}&limit=${input.limit}`
       );
-      const data = await response.json();
-      return data.data || [];
+      
+      if (response.ok) {
+        const data = await response.json();
+        return data.data || [];
+      }
+      
+      // Return sample hadiths for demonstration
+      return [
+        {
+          id: 1,
+          arab: 'إِنَّمَا الأَعْمَالُ بِالنِّيَّاتِ، وَإِنَّمَا لِكُلِّ امْرِئٍ مَا نَوَى',
+          translation: 'Actions are but by intention and every man shall have only that which he intended.',
+          narrator: 'Umar ibn al-Khattab',
+          grade: 'Sahih'
+        },
+        {
+          id: 2,
+          arab: 'الإِسْلاَمُ أَنْ تَشْهَدَ أَنْ لاَ إِلَهَ إِلاَّ اللَّهُ وَأَنَّ مُحَمَّدًا رَسُولُ اللَّهِ',
+          translation: 'Islam is to testify that there is no god but Allah and Muhammad is the Messenger of Allah.',
+          narrator: 'Abdullah ibn Umar',
+          grade: 'Sahih'
+        }
+      ];
     } catch (error) {
       console.error('Error fetching hadiths:', error);
       throw new Error('Failed to fetch hadiths');

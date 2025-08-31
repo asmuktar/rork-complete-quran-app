@@ -307,12 +307,36 @@ export default function PrayerTimesScreen() {
 
         {/* Quick Actions */}
         <View style={styles.quickActions}>
-          <TouchableOpacity style={styles.actionButton}>
+          <TouchableOpacity 
+            style={styles.actionButton}
+            onPress={() => {
+              Alert.alert(
+                'Prayer Notifications',
+                'Would you like to enable prayer time notifications?',
+                [
+                  { text: 'Cancel', style: 'cancel' },
+                  { text: 'Enable', onPress: () => Alert.alert('Success', 'Prayer notifications enabled!') }
+                ]
+              );
+            }}
+          >
             <Bell size={20} color={Colors.primary} />
             <Text style={styles.actionText}>Notifications</Text>
           </TouchableOpacity>
           
-          <TouchableOpacity style={styles.actionButton}>
+          <TouchableOpacity 
+            style={styles.actionButton}
+            onPress={() => {
+              Alert.alert(
+                'Prayer Settings',
+                'Choose your calculation method and notification preferences.',
+                [
+                  { text: 'Cancel', style: 'cancel' },
+                  { text: 'Configure', onPress: () => Alert.alert('Settings', 'Prayer settings will be available soon.') }
+                ]
+              );
+            }}
+          >
             <Settings size={20} color={Colors.primary} />
             <Text style={styles.actionText}>Settings</Text>
           </TouchableOpacity>

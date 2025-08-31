@@ -1,48 +1,296 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Search, Filter, BookOpen } from 'lucide-react-native';
+import { Search, Filter, BookOpen, User } from 'lucide-react-native';
 import { Colors } from '@/constants/colors';
+import { trpc } from '@/lib/trpc';
+
+interface SearchFilters {
+  collection: string;
+  narrator: string;
+  topic: string;
+  grade: string;
+}
+
+interface HadithResult {
+  id: number;
+  arab: string;
+  translation: string;
+  narrator: string;
+  grade: string;
+  collection: string;
+  reference: string;
+}
 
 export default function AdvancedHadithSearchScreen() {
-  const handleSearch = () => {
-    Alert.alert('Coming Soon', 'Advanced hadith search feature will be available soon.');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filters, setFilters] = useState<SearchFilters>({
+    collection: '',
+    narrator: '',
+    topic: '',
+    grade: ''
+  });
+  const [showFilters, setShowFilters] = useState(false);
+  const [searchResults, setSearchResults] = useState<HadithResult[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [hasSearched, setHasSearched] = useState(false);
+
+  const searchHadiths = async (query: string, collection?: string) => {
+    try {
+      setIsLoading(true);
+      setHasSearched(false);
+      
+      // Mock search results for now
+      const mockResults: HadithResult[] = [
+        {
+          id: 1,
+          arab: 'إِنَّمَا الأَعْمَالُ بِالنِّيَّاتِ، وَإِنَّمَا لِكُلِّ امْرِئٍ مَا نَوَى',
+          translation: 'Actions are but by intention and every man shall have only that which he intended.',
+          narrator: 'Umar ibn al-Khattab',
+          grade: 'Sahih',
+          collection: 'Sahih al-Bukhari',
+          reference: 'Book 1, Hadith 1'
+        },
+        {
+          id: 2,
+          arab: 'الإِسْلاَمُ أَنْ تَشْهَدَ أَنْ لاَ إِلَهَ إِلاَّ اللَّهُ وَأَنَّ مُحَمَّدًا رَسُولُ اللَّهِ',
+          translation: 'Islam is to testify that there is no god but Allah and Muhammad is the Messenger of Allah.',
+          narrator: 'Abdullah ibn Umar',
+          grade: 'Sahih',
+          collection: 'Sahih Muslim',
+          reference: 'Book 1, Hadith 1'
+        }
+      ];
+      
+      // Filter results based on query
+      const filteredResults = mockResults.filter(hadith => 
+        hadith.translation.toLowerCase().includes(query.toLowerCase()) ||
+        hadith.arab.includes(query) ||
+        hadith.narrator.toLowerCase().includes(query.toLowerCase())
+      );
+      
+      setSearchResults(filteredResults);
+      setIsLoading(false);
+      setHasSearched(true);
+    } catch (error) {
+      console.error('Search error:', error);
+      setIsLoading(false);
+      Alert.alert('Search Error', 'Failed to search hadiths. Please try again.');
+    }
   };
+
+  const handleSearch = () => {
+    if (!searchQuery.trim()) {
+      Alert.alert('Input Required', 'Please enter a search term.');
+      return;
+    }
+
+    setIsLoading(true);
+    setHasSearched(false);
+    searchHadiths(searchQuery.trim(), filters.collection || undefined);
+  };
+
+  const resetFilters = () => {
+    setFilters({
+      collection: '',
+      narrator: '',
+      topic: '',
+      grade: ''
+    });
+  };
+
+  const collections = [
+    { id: 'bukhari', name: 'Sahih al-Bukhari' },
+    { id: 'muslim', name: 'Sahih Muslim' },
+    { id: 'abudawud', name: 'Sunan Abu Dawud' },
+    { id: 'tirmidhi', name: 'Jami at-Tirmidhi' },
+    { id: 'nasai', name: 'Sunan an-Nasa\'i' },
+    { id: 'ibnmajah', name: 'Sunan Ibn Majah' }
+  ];
+
+  const grades = ['Sahih', 'Hasan', 'Daif', 'Mawdu'];
 
   return (
     <SafeAreaView style={styles.container}>
       <LinearGradient
-        colors={Colors.gradients.islamic as [string, string]}
+        colors={Colors.gradients.accent as [string, string]}
         style={styles.header}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
       >
         <View style={styles.headerContent}>
           <Search size={28} color={Colors.textOnPrimary} />
-          <Text style={styles.title}>Advanced Search</Text>
-          <Text style={styles.subtitle}>Search Hadith by Topic</Text>
+          <Text style={styles.title}>Advanced Hadith Search</Text>
+          <Text style={styles.subtitle}>Search by topic, narrator, or collection</Text>
         </View>
       </LinearGradient>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.comingSoonCard}>
-          <BookOpen size={64} color={Colors.primary} />
-          <Text style={styles.comingSoonTitle}>Feature Coming Soon</Text>
-          <Text style={styles.comingSoonText}>
-            We are developing an advanced search system that will allow you to search 
-            hadiths by topic, narrator, collection, and authenticity grade.
-          </Text>
-          
-          <TouchableOpacity style={styles.notifyButton} onPress={handleSearch}>
-            <LinearGradient
-              colors={Colors.gradients.primary as [string, string]}
-              style={styles.notifyGradient}
-            >
-              <Text style={styles.notifyButtonText}>Get Notified</Text>
-            </LinearGradient>
+        {/* Search Input */}
+        <View style={styles.searchSection}>
+          <View style={styles.searchBox}>
+            <Search size={20} color={Colors.textLight} style={styles.searchIcon} />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search hadiths by keyword, topic, or content..."
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              placeholderTextColor={Colors.textLight}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+          </View>
+
+          <TouchableOpacity
+            style={styles.filterToggle}
+            onPress={() => setShowFilters(!showFilters)}
+          >
+            <Filter size={20} color={Colors.primary} />
+            <Text style={styles.filterToggleText}>Filters</Text>
           </TouchableOpacity>
         </View>
+
+        {/* Filters */}
+        {showFilters && (
+          <View style={styles.filtersSection}>
+            <View style={styles.filterRow}>
+              <Text style={styles.filterLabel}>Collection</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                <View style={styles.filterOptions}>
+                  <TouchableOpacity
+                    style={[styles.filterButton, !filters.collection && styles.filterButtonActive]}
+                    onPress={() => setFilters(prev => ({ ...prev, collection: '' }))}
+                  >
+                    <Text style={[styles.filterButtonText, !filters.collection && styles.filterButtonTextActive]}>
+                      All
+                    </Text>
+                  </TouchableOpacity>
+                  {collections.map((collection) => (
+                    <TouchableOpacity
+                      key={collection.id}
+                      style={[styles.filterButton, filters.collection === collection.id && styles.filterButtonActive]}
+                      onPress={() => setFilters(prev => ({ ...prev, collection: collection.id }))}
+                    >
+                      <Text style={[styles.filterButtonText, filters.collection === collection.id && styles.filterButtonTextActive]}>
+                        {collection.name}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </ScrollView>
+            </View>
+
+            <View style={styles.filterRow}>
+              <Text style={styles.filterLabel}>Grade</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                <View style={styles.filterOptions}>
+                  <TouchableOpacity
+                    style={[styles.filterButton, !filters.grade && styles.filterButtonActive]}
+                    onPress={() => setFilters(prev => ({ ...prev, grade: '' }))}
+                  >
+                    <Text style={[styles.filterButtonText, !filters.grade && styles.filterButtonTextActive]}>
+                      All
+                    </Text>
+                  </TouchableOpacity>
+                  {grades.map((grade) => (
+                    <TouchableOpacity
+                      key={grade}
+                      style={[styles.filterButton, filters.grade === grade && styles.filterButtonActive]}
+                      onPress={() => setFilters(prev => ({ ...prev, grade: grade }))}
+                    >
+                      <Text style={[styles.filterButtonText, filters.grade === grade && styles.filterButtonTextActive]}>
+                        {grade}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </ScrollView>
+            </View>
+
+            <TouchableOpacity style={styles.resetFiltersButton} onPress={resetFilters}>
+              <Text style={styles.resetFiltersText}>Reset Filters</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* Search Button */}
+        <TouchableOpacity
+          style={styles.searchButton}
+          onPress={handleSearch}
+          disabled={isLoading}
+        >
+          <LinearGradient
+            colors={Colors.gradients.primary as [string, string]}
+            style={styles.searchGradient}
+          >
+            <Search size={20} color={Colors.textOnPrimary} />
+            <Text style={styles.searchButtonText}>
+              {isLoading ? 'Searching...' : 'Search Hadiths'}
+            </Text>
+          </LinearGradient>
+        </TouchableOpacity>
+
+        {/* Results */}
+        {isLoading && (
+          <View style={styles.loadingContainer}>
+            <Text style={styles.loadingText}>Searching hadiths...</Text>
+          </View>
+        )}
+
+        {!isLoading && hasSearched && searchResults.length === 0 && (
+          <View style={styles.noResultsContainer}>
+            <BookOpen size={48} color={Colors.textLight} />
+            <Text style={styles.noResultsTitle}>No hadiths found</Text>
+            <Text style={styles.noResultsText}>
+              Try different keywords or adjust your filters
+            </Text>
+          </View>
+        )}
+
+        {!isLoading && searchResults.length > 0 && (
+          <View style={styles.resultsContainer}>
+            <Text style={styles.resultsHeader}>
+              {searchResults.length} hadith{searchResults.length !== 1 ? 's' : ''} found
+            </Text>
+            {searchResults.map((hadith, index) => (
+              <View key={index} style={styles.hadithCard}>
+                <View style={styles.hadithHeader}>
+                  <View style={styles.hadithMeta}>
+                    <Text style={styles.hadithCollection}>{hadith.collection || 'Sahih Bukhari'}</Text>
+                    <View style={styles.gradeBadge}>
+                      <Text style={styles.gradeText}>{hadith.grade || 'Sahih'}</Text>
+                    </View>
+                  </View>
+                  <Text style={styles.hadithReference}>{hadith.reference || 'Book 1, Hadith 1'}</Text>
+                </View>
+
+                <Text style={styles.hadithArabic}>{hadith.arab}</Text>
+                <Text style={styles.hadithTranslation}>{hadith.translation}</Text>
+
+                <View style={styles.hadithFooter}>
+                  <View style={styles.narratorInfo}>
+                    <User size={14} color={Colors.textLight} />
+                    <Text style={styles.narratorText}>Narrated by: {hadith.narrator}</Text>
+                  </View>
+                </View>
+              </View>
+            ))}
+          </View>
+        )}
+
+        {/* Search Tips */}
+        {!hasSearched && (
+          <View style={styles.tipsSection}>
+            <Text style={styles.tipsTitle}>Search Tips</Text>
+            <View style={styles.tipsList}>
+              <Text style={styles.tipItem}>• Use specific keywords for better results</Text>
+              <Text style={styles.tipItem}>• Filter by collection to narrow down results</Text>
+              <Text style={styles.tipItem}>• Search in both Arabic and English</Text>
+              <Text style={styles.tipItem}>• Use grade filters to find authentic hadiths</Text>
+            </View>
+          </View>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -77,49 +325,256 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 20,
   },
-  comingSoonCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: 20,
-    padding: 40,
-    alignItems: 'center',
-    marginTop: 40,
-    elevation: 4,
-    shadowColor: Colors.text,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
-  comingSoonTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: Colors.text,
-    textAlign: 'center',
+  searchSection: {
     marginTop: 20,
     marginBottom: 16,
   },
-  comingSoonText: {
-    fontSize: 16,
-    color: Colors.textSecondary,
-    textAlign: 'center',
-    lineHeight: 24,
-    marginBottom: 30,
+  searchBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.surface,
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    marginBottom: 12,
+    elevation: 2,
+    shadowColor: Colors.text,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
   },
-  notifyButton: {
+  searchIcon: {
+    marginRight: 12,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    color: Colors.text,
+    fontWeight: '400',
+  },
+  filterToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.surface,
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    gap: 8,
+  },
+  filterToggleText: {
+    fontSize: 16,
+    color: Colors.primary,
+    fontWeight: '500',
+  },
+  filtersSection: {
+    backgroundColor: Colors.surface,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+    elevation: 2,
+    shadowColor: Colors.text,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+  filterRow: {
+    marginBottom: 16,
+  },
+  filterLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: Colors.text,
+    marginBottom: 8,
+  },
+  filterOptions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  filterButton: {
+    backgroundColor: Colors.surfaceVariant,
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  filterButtonActive: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
+  },
+  filterButtonText: {
+    fontSize: 14,
+    color: Colors.textSecondary,
+    fontWeight: '500',
+  },
+  filterButtonTextActive: {
+    color: Colors.textOnPrimary,
+  },
+  resetFiltersButton: {
+    alignSelf: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+  },
+  resetFiltersText: {
+    fontSize: 14,
+    color: Colors.primary,
+    fontWeight: '500',
+  },
+  searchButton: {
     borderRadius: 16,
     overflow: 'hidden',
+    marginBottom: 24,
     elevation: 4,
     shadowColor: Colors.text,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
   },
-  notifyGradient: {
-    paddingHorizontal: 32,
+  searchGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     paddingVertical: 16,
+    paddingHorizontal: 24,
+    gap: 8,
   },
-  notifyButtonText: {
+  searchButtonText: {
     fontSize: 16,
     fontWeight: '600',
     color: Colors.textOnPrimary,
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  loadingText: {
+    fontSize: 16,
+    color: Colors.textSecondary,
+    fontWeight: '500',
+  },
+  noResultsContainer: {
+    alignItems: 'center',
+    paddingVertical: 40,
+    gap: 16,
+  },
+  noResultsTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: Colors.text,
+    textAlign: 'center',
+  },
+  noResultsText: {
+    fontSize: 16,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+  },
+  resultsContainer: {
+    marginBottom: 24,
+  },
+  resultsHeader: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: Colors.textSecondary,
+    marginBottom: 16,
+  },
+  hadithCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+    elevation: 2,
+    shadowColor: Colors.text,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    borderLeftWidth: 4,
+    borderLeftColor: Colors.success,
+  },
+  hadithHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  hadithMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  hadithCollection: {
+    fontSize: 14,
+    color: Colors.primary,
+    fontWeight: '600',
+  },
+  gradeBadge: {
+    backgroundColor: Colors.success,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  gradeText: {
+    fontSize: 10,
+    color: Colors.textOnPrimary,
+    fontWeight: 'bold',
+  },
+  hadithReference: {
+    fontSize: 12,
+    color: Colors.textLight,
+    fontWeight: '500',
+  },
+  hadithArabic: {
+    fontSize: 18,
+    color: Colors.text,
+    textAlign: 'right',
+    lineHeight: 28,
+    marginBottom: 8,
+    fontWeight: '500',
+  },
+  hadithTranslation: {
+    fontSize: 16,
+    color: Colors.textSecondary,
+    lineHeight: 24,
+    marginBottom: 12,
+  },
+  hadithFooter: {
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: Colors.surfaceVariant,
+  },
+  narratorInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  narratorText: {
+    fontSize: 12,
+    color: Colors.textLight,
+    fontWeight: '500',
+  },
+  tipsSection: {
+    backgroundColor: Colors.surface,
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 24,
+    elevation: 2,
+    shadowColor: Colors.text,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+  tipsTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: Colors.text,
+    marginBottom: 12,
+  },
+  tipsList: {
+    gap: 8,
+  },
+  tipItem: {
+    fontSize: 14,
+    color: Colors.textSecondary,
+    lineHeight: 20,
   },
 });
