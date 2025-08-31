@@ -23,6 +23,7 @@ function RootLayoutNav() {
       <Stack.Screen name="verify-hadith" options={{ title: "Verify Hadith" }} />
       <Stack.Screen name="advanced-hadith-search" options={{ title: "Advanced Hadith Search" }} />
       <Stack.Screen name="hadith-collections" options={{ title: "Hadith Collections" }} />
+      <Stack.Screen name="hadith-collection/[id]" options={{ title: "Hadith Collection" }} />
       <Stack.Screen name="bookmarks" options={{ title: "Bookmarks" }} />
       <Stack.Screen name="favorites" options={{ title: "Favorites" }} />
       <Stack.Screen name="settings" options={{ title: "Settings" }} />
