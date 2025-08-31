@@ -45,6 +45,8 @@ export default function SurahScreen() {
   
   const handlePlayWholeSurah = async () => {
     try {
+      // Stop any current playback first
+      await audioPlayer.stopPlayback();
       await audioPlayer.playWholeSurah(surah.id, surah.ayahs);
     } catch (error) {
       console.error('Error playing whole surah:', error);
@@ -54,6 +56,11 @@ export default function SurahScreen() {
   
   const handlePlayAyah = async (ayahNumber: number) => {
     try {
+      // Don't play Basmallah (ayah 0) separately
+      if (ayahNumber === 0) return;
+      
+      // Stop any current playback first
+      await audioPlayer.stopPlayback();
       await audioPlayer.playAyah(surah.id, ayahNumber);
     } catch (error) {
       console.error('Error playing ayah:', error);
@@ -282,54 +289,68 @@ export default function SurahScreen() {
         style={styles.content} 
         showsVerticalScrollIndicator={false}
       >
-        {surah.verses.map((ayah: Ayah) => (
-          <View 
-            key={ayah.number} 
-            style={[
-              styles.ayahCard,
-              audioPlayer.currentAyah === ayah.number && styles.ayahCardActive
-            ]}
-          >
-            <View style={styles.ayahHeader}>
-              <View style={styles.ayahNumber}>
-                <Text style={styles.ayahNumberText}>{ayah.number}</Text>
+        {surah.verses.map((ayah: Ayah) => {
+          const isBasmallah = ayah.number === 0;
+          const displayNumber = isBasmallah ? 'بسم الله' : ayah.number.toString();
+          
+          return (
+            <View 
+              key={`${surah.id}-${ayah.number}`} 
+              style={[
+                styles.ayahCard,
+                audioPlayer.currentAyah === ayah.number && styles.ayahCardActive,
+                isBasmallah && styles.basmallahCard
+              ]}
+            >
+              <View style={styles.ayahHeader}>
+                <View style={[styles.ayahNumber, isBasmallah && styles.basmallahNumber]}>
+                  <Text style={[styles.ayahNumberText, isBasmallah && styles.basmallahNumberText]}>
+                    {displayNumber}
+                  </Text>
+                </View>
+                
+                {!isBasmallah && (
+                  <View style={styles.ayahActions}>
+                    <TouchableOpacity
+                      onPress={() => toggleBookmark(ayah.number)}
+                      style={styles.actionButton}
+                    >
+                      {bookmarkedAyahs.has(ayah.number) ? (
+                        <BookmarkCheck size={20} color={Colors.islamicGold} />
+                      ) : (
+                        <Bookmark size={20} color={Colors.textLight} />
+                      )}
+                    </TouchableOpacity>
+                    
+                    <TouchableOpacity
+                      onPress={() => handlePlayAyah(ayah.number)}
+                      style={styles.actionButton}
+                      disabled={audioPlayer.isLoading}
+                    >
+                      <Volume2 size={20} color={Colors.primary} />
+                    </TouchableOpacity>
+                  </View>
+                )}
               </View>
               
-              <View style={styles.ayahActions}>
-                <TouchableOpacity
-                  onPress={() => toggleBookmark(ayah.number)}
-                  style={styles.actionButton}
-                >
-                  {bookmarkedAyahs.has(ayah.number) ? (
-                    <BookmarkCheck size={20} color={Colors.islamicGold} />
-                  ) : (
-                    <Bookmark size={20} color={Colors.textLight} />
-                  )}
-                </TouchableOpacity>
-                
-                <TouchableOpacity
-                  onPress={() => handlePlayAyah(ayah.number)}
-                  style={styles.actionButton}
-                  disabled={audioPlayer.isLoading}
-                >
-                  <Volume2 size={20} color={Colors.primary} />
-                </TouchableOpacity>
-              </View>
+              <Text style={[styles.ayahArabicText, isBasmallah && styles.basmallahText]}>
+                {ayah.text}
+              </Text>
+              
+              {showTransliteration && ayah.transliteration && (
+                <Text style={styles.ayahTransliteration}>{ayah.transliteration}</Text>
+              )}
+              
+              <Text style={styles.ayahTranslation}>{ayah.translation}</Text>
+              
+              {!isBasmallah && (
+                <View style={styles.ayahMeta}>
+                  <Text style={styles.metaText}>Juz {ayah.juz} • Hizb {ayah.hizb}</Text>
+                </View>
+              )}
             </View>
-            
-            <Text style={styles.ayahArabicText}>{ayah.text}</Text>
-            
-            {showTransliteration && ayah.transliteration && (
-              <Text style={styles.ayahTransliteration}>{ayah.transliteration}</Text>
-            )}
-            
-            <Text style={styles.ayahTranslation}>{ayah.translation}</Text>
-            
-            <View style={styles.ayahMeta}>
-              <Text style={styles.metaText}>Juz {ayah.juz} • Hizb {ayah.hizb}</Text>
-            </View>
-          </View>
-        ))}
+          );
+        })}
         
         <View style={styles.footer}>
           <Text style={styles.footerText}>End of Surah {surah.name}</Text>
@@ -557,6 +578,28 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     borderLeftWidth: 4,
     borderLeftColor: Colors.surfaceVariant,
+  },
+  basmallahCard: {
+    backgroundColor: Colors.primaryOverlay,
+    borderLeftColor: Colors.islamicGold,
+    marginVertical: 12,
+  },
+  basmallahNumber: {
+    backgroundColor: Colors.islamicGold,
+    borderColor: Colors.islamicGold,
+    minWidth: 80,
+  },
+  basmallahNumberText: {
+    color: Colors.textOnPrimary,
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  basmallahText: {
+    fontSize: 28,
+    textAlign: 'center',
+    color: Colors.primary,
+    fontWeight: '600',
+    marginVertical: 8,
   },
   ayahCardActive: {
     borderLeftColor: Colors.islamicGold,

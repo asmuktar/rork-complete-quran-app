@@ -25,6 +25,20 @@ export interface Surah {
 const createSampleAyahs = (surahId: number, totalAyahs: number): Ayah[] => {
   const ayahs: Ayah[] = [];
   
+  // Add Basmallah for all surahs except At-Tawbah (Surah 9)
+  if (surahId !== 9 && surahId !== 1) {
+    ayahs.push({
+      number: 0, // Basmallah is not counted as a verse
+      text: 'بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ',
+      translation: 'In the name of Allah, the Entirely Merciful, the Especially Merciful.',
+      transliteration: 'Bismillahir-Rahmanir-Raheem',
+      juz: Math.ceil((surahId * 10) / 20),
+      hizb: Math.ceil((surahId * 10) / 10),
+      rub: Math.ceil((surahId * 10) / 5),
+      sajda: false
+    });
+  }
+  
   for (let i = 1; i <= totalAyahs; i++) {
     ayahs.push({
       number: i,
@@ -57,6 +71,11 @@ const getSampleArabicText = (surahId: number, ayahNumber: number): string => {
     return sampleTexts[ayahNumber - 1];
   }
   
+  // For Surah At-Tawbah (9), don't start with Basmallah
+  if (surahId === 9 && ayahNumber === 1) {
+    return 'بَرَاءَةٌ مِّنَ اللَّهِ وَرَسُولِهِ إِلَى الَّذِينَ عَاهَدتُّم مِّنَ الْمُشْرِكِينَ';
+  }
+  
   return `آية رقم ${ayahNumber} من سورة رقم ${surahId}`;
 };
 
@@ -76,6 +95,11 @@ const getSampleTranslation = (surahId: number, ayahNumber: number): string => {
     return sampleTranslations[ayahNumber - 1];
   }
   
+  // For Surah At-Tawbah (9), first verse translation
+  if (surahId === 9 && ayahNumber === 1) {
+    return '[This is a declaration of] disassociation, from Allah and His Messenger, to those with whom you had made a treaty among the polytheists.';
+  }
+  
   return `Translation of verse ${ayahNumber} from chapter ${surahId}`;
 };
 
@@ -93,6 +117,11 @@ const getSampleTransliteration = (surahId: number, ayahNumber: number): string =
   
   if (surahId === 1 && ayahNumber <= 7) {
     return sampleTransliterations[ayahNumber - 1];
+  }
+  
+  // For Surah At-Tawbah (9), first verse transliteration
+  if (surahId === 9 && ayahNumber === 1) {
+    return 'Bara\'atun mina Allahi wa rasulihi ila alladhina ahadtum mina almushrikeen';
   }
   
   return `Transliteration of verse ${ayahNumber} from chapter ${surahId}`;
