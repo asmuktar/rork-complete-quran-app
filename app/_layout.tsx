@@ -20,9 +20,9 @@ function RootLayoutNav() {
       <Stack.Screen name="calendar" options={{ title: "Islamic Calendar" }} />
       <Stack.Screen name="reciters" options={{ title: "Quran Reciters" }} />
       <Stack.Screen name="reciter/[id]" options={{ title: "Reciter Profile" }} />
-      <Stack.Screen name="hadith-verify" options={{ title: "Verify Hadith" }} />
-      <Stack.Screen name="hadith-search" options={{ title: "Search Hadith" }} />
-      <Stack.Screen name="hadith/[id]" options={{ title: "Hadith Collection" }} />
+      <Stack.Screen name="verify-hadith" options={{ title: "Verify Hadith" }} />
+      <Stack.Screen name="advanced-hadith-search" options={{ title: "Advanced Hadith Search" }} />
+      <Stack.Screen name="hadith-collections" options={{ title: "Hadith Collections" }} />
       <Stack.Screen name="bookmarks" options={{ title: "Bookmarks" }} />
       <Stack.Screen name="favorites" options={{ title: "Favorites" }} />
       <Stack.Screen name="settings" options={{ title: "Settings" }} />

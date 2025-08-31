@@ -1,47 +1,107 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import React, { useState } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  TextInput,
+  Alert,
+  ActivityIndicator,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Shield, Search, ExternalLink, CheckCircle } from 'lucide-react-native';
+import { Search, CheckCircle, XCircle, BookOpen } from 'lucide-react-native';
 import { Colors } from '@/constants/colors';
+import { trpc } from '@/lib/trpc';
 
 export default function VerifyHadithScreen() {
-  const handleVerifyHadith = () => {
-    Alert.alert('Coming Soon', 'Hadith verification feature will be available soon.');
+  const [hadithText, setHadithText] = useState('');
+  const [isVerifying, setIsVerifying] = useState(false);
+
+  const verifyMutation = trpc.hadith.verifyHadith.useMutation({
+    onSuccess: (data: any) => {
+      setIsVerifying(false);
+      Alert.alert(
+        'Hadith Verification Result',
+        `Grade: ${data.grade}\nSource: ${data.source}\nReference: ${data.reference}\n\n${data.explanation}`,
+        [{ text: 'OK' }]
+      );
+    },
+    onError: (error: any) => {
+      setIsVerifying(false);
+      Alert.alert('Error', error.message);
+    },
+  });
+
+  const handleVerify = () => {
+    if (!hadithText.trim()) {
+      Alert.alert('Error', 'Please enter hadith text to verify');
+      return;
+    }
+    setIsVerifying(true);
+    verifyMutation.mutate({ text: hadithText.trim() });
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      <LinearGradient
-        colors={Colors.gradients.islamic as [string, string]}
-        style={styles.header}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-      >
-        <View style={styles.headerContent}>
-          <Shield size={28} color={Colors.textOnPrimary} />
-          <Text style={styles.title}>Verify Hadith</Text>
-          <Text style={styles.subtitle}>Check Authenticity & Chain</Text>
-        </View>
-      </LinearGradient>
-
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.comingSoonCard}>
-          <CheckCircle size={64} color={Colors.primary} />
-          <Text style={styles.comingSoonTitle}>Feature Coming Soon</Text>
-          <Text style={styles.comingSoonText}>
-            We are working on implementing a comprehensive hadith verification system 
-            that will allow you to check the authenticity and chain of narration for any hadith.
+      <ScrollView style={styles.content}>
+        <View style={styles.header}>
+          <BookOpen size={32} color={Colors.primary} />
+          <Text style={styles.title}>Verify Hadith Authenticity</Text>
+          <Text style={styles.subtitle}>
+            Enter the hadith text below to check its authenticity and chain of narration
           </Text>
-          
-          <TouchableOpacity style={styles.notifyButton} onPress={handleVerifyHadith}>
-            <LinearGradient
-              colors={Colors.gradients.primary as [string, string]}
-              style={styles.notifyGradient}
-            >
-              <Text style={styles.notifyButtonText}>Get Notified</Text>
-            </LinearGradient>
-          </TouchableOpacity>
+        </View>
+
+        <View style={styles.inputContainer}>
+          <Text style={styles.inputLabel}>Hadith Text</Text>
+          <TextInput
+            style={styles.textInput}
+            multiline
+            numberOfLines={6}
+            placeholder="Enter the hadith text you want to verify..."
+            placeholderTextColor={Colors.textLight}
+            value={hadithText}
+            onChangeText={setHadithText}
+            textAlignVertical="top"
+          />
+        </View>
+
+        <TouchableOpacity
+          style={[styles.verifyButton, isVerifying && styles.verifyButtonDisabled]}
+          onPress={handleVerify}
+          disabled={isVerifying}
+        >
+          {isVerifying ? (
+            <ActivityIndicator color={Colors.surface} size="small" />
+          ) : (
+            <Search size={20} color={Colors.surface} />
+          )}
+          <Text style={styles.verifyButtonText}>
+            {isVerifying ? 'Verifying...' : 'Verify Hadith'}
+          </Text>
+        </TouchableOpacity>
+
+        <View style={styles.infoSection}>
+          <Text style={styles.infoTitle}>About Hadith Verification</Text>
+          <View style={styles.infoItem}>
+            <CheckCircle size={16} color={Colors.success} />
+            <Text style={styles.infoText}>
+              Authentic hadiths are verified through multiple chains of narration
+            </Text>
+          </View>
+          <View style={styles.infoItem}>
+            <CheckCircle size={16} color={Colors.success} />
+            <Text style={styles.infoText}>
+              Grading system: Sahih (Authentic), Hasan (Good), Da&apos;if (Weak)
+            </Text>
+          </View>
+          <View style={styles.infoItem}>
+            <XCircle size={16} color={Colors.error} />
+            <Text style={styles.infoText}>
+              Always cross-reference with multiple authentic sources
+            </Text>
+          </View>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -53,73 +113,86 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.background,
   },
-  header: {
-    paddingVertical: 30,
-    paddingHorizontal: 20,
-  },
-  headerContent: {
-    alignItems: 'center',
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: Colors.textOnPrimary,
-    textAlign: 'center',
-    marginTop: 8,
-    marginBottom: 4,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.9)',
-    textAlign: 'center',
-  },
   content: {
     flex: 1,
-    paddingHorizontal: 20,
+    padding: 20,
   },
-  comingSoonCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: 20,
-    padding: 40,
+  header: {
     alignItems: 'center',
-    marginTop: 40,
-    elevation: 4,
-    shadowColor: Colors.text,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    marginBottom: 30,
   },
-  comingSoonTitle: {
+  title: {
     fontSize: 24,
     fontWeight: 'bold',
     color: Colors.text,
+    marginTop: 10,
     textAlign: 'center',
-    marginTop: 20,
-    marginBottom: 16,
   },
-  comingSoonText: {
+  subtitle: {
     fontSize: 16,
-    color: Colors.textSecondary,
+    color: Colors.textLight,
     textAlign: 'center',
-    lineHeight: 24,
-    marginBottom: 30,
+    marginTop: 8,
+    lineHeight: 22,
   },
-  notifyButton: {
-    borderRadius: 16,
-    overflow: 'hidden',
-    elevation: 4,
-    shadowColor: Colors.text,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+  inputContainer: {
+    marginBottom: 20,
   },
-  notifyGradient: {
-    paddingHorizontal: 32,
-    paddingVertical: 16,
-  },
-  notifyButtonText: {
+  inputLabel: {
     fontSize: 16,
     fontWeight: '600',
-    color: Colors.textOnPrimary,
+    color: Colors.text,
+    marginBottom: 8,
+  },
+  textInput: {
+    backgroundColor: Colors.surface,
+    borderRadius: 12,
+    padding: 16,
+    fontSize: 16,
+    color: Colors.text,
+    borderWidth: 1,
+    borderColor: Colors.surfaceVariant,
+    minHeight: 120,
+  },
+  verifyButton: {
+    backgroundColor: Colors.primary,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 30,
+    gap: 8,
+  },
+  verifyButtonDisabled: {
+    opacity: 0.6,
+  },
+  verifyButtonText: {
+    color: Colors.surface,
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  infoSection: {
+    backgroundColor: Colors.surface,
+    borderRadius: 12,
+    padding: 20,
+  },
+  infoTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: Colors.text,
+    marginBottom: 16,
+  },
+  infoItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 12,
+    gap: 8,
+  },
+  infoText: {
+    flex: 1,
+    fontSize: 14,
+    color: Colors.textLight,
+    lineHeight: 20,
   },
 });

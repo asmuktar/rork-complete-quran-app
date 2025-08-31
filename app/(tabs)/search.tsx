@@ -5,7 +5,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Search, Mic, MicOff, Volume2, BookOpen, User, Loader, Play, Pause } from 'lucide-react-native';
 import { Colors } from '@/constants/colors';
 import { Audio } from 'expo-av';
-import quranApi from '@/services/quran-api';
+import { trpc } from '@/lib/trpc';
 import { SURAHS, searchSurahs } from '@/constants/quran-data';
 
 const { width } = Dimensions.get('window');
@@ -31,6 +31,48 @@ export default function SearchScreen() {
   const [hasSearched, setHasSearched] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const [isProcessing, setIsProcessing] = useState(false);
+  
+  const searchMutation = trpc.quran.searchVerses.useMutation({
+    onSuccess: (data) => {
+      const results: SearchResult[] = data.map((result: any) => ({
+        id: `ayah-${result.verse_key}`,
+        type: 'ayah' as const,
+        title: `${result.verse_key}`,
+        arabicText: result.text_uthmani,
+        translation: result.translations?.[0]?.text || '',
+        surahNumber: parseInt(result.verse_key.split(':')[0]),
+        ayahNumber: parseInt(result.verse_key.split(':')[1]),
+      }));
+      setSearchResults(results);
+      setIsLoading(false);
+    },
+    onError: (error) => {
+      console.error('Search error:', error);
+      setIsLoading(false);
+      Alert.alert('Search Error', 'Failed to search verses. Please try again.');
+    },
+  });
+  
+  const voiceSearchMutation = trpc.quran.voiceSearch.useMutation({
+    onSuccess: (data) => {
+      const results: SearchResult[] = data.map((result: any) => ({
+        id: `ayah-${result.verse_key}`,
+        type: 'ayah' as const,
+        title: `${result.verse_key}`,
+        arabicText: result.text_uthmani,
+        translation: result.translations?.[0]?.text || '',
+        surahNumber: parseInt(result.verse_key.split(':')[0]),
+        ayahNumber: parseInt(result.verse_key.split(':')[1]),
+      }));
+      setSearchResults(results);
+      setIsProcessing(false);
+    },
+    onError: (error) => {
+      console.error('Voice search error:', error);
+      setIsProcessing(false);
+      Alert.alert('Voice Search Error', 'Failed to process voice search. Please try again.');
+    },
+  });
   
   const recordingRef = useRef<Audio.Recording | null>(null);
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -109,77 +151,10 @@ export default function SearchScreen() {
 
     setIsLoading(true);
     setHasSearched(true);
-
-    // Simulate search delay
-    setTimeout(() => {
-      const results: SearchResult[] = [];
-      const lowercaseQuery = query.toLowerCase();
-
-      // Search surahs
-      const surahResults = searchSurahs(query);
-      surahResults.slice(0, 3).forEach(surah => {
-        results.push({
-          id: `surah-${surah.id}`,
-          type: 'surah',
-          title: surah.name,
-          subtitle: surah.englishName,
-          description: `${surah.ayahs} verses • ${surah.revelationType}`,
-          surahNumber: surah.id,
-        });
-      });
-
-      // Mock Quran search results
-      if (lowercaseQuery.includes('bismillah') || lowercaseQuery.includes('بسم')) {
-        results.push({
-          id: 'ayah-1-1',
-          type: 'ayah',
-          title: 'Al-Fatihah 1:1',
-          arabicText: 'بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ',
-          translation: 'In the name of Allah, the Entirely Merciful, the Especially Merciful.',
-          surahNumber: 1,
-          ayahNumber: 1,
-        });
-      }
-
-      if (lowercaseQuery.includes('allah') || lowercaseQuery.includes('الله')) {
-        results.push(
-          {
-            id: 'ayah-2-255',
-            type: 'ayah',
-            title: 'Al-Baqarah 2:255',
-            arabicText: 'اللَّهُ لَا إِلَٰهَ إِلَّا هُوَ الْحَيُّ الْقَيُّومُ',
-            translation: 'Allah - there is no deity except Him, the Ever-Living, the Sustainer of existence.',
-            surahNumber: 2,
-            ayahNumber: 255,
-          },
-          {
-            id: 'ayah-112-1',
-            type: 'ayah',
-            title: 'Al-Ikhlas 112:1',
-            arabicText: 'قُلْ هُوَ اللَّهُ أَحَدٌ',
-            translation: 'Say, "He is Allah, [who is] One,"',
-            surahNumber: 112,
-            ayahNumber: 1,
-          }
-        );
-      }
-
-      // Mock surah results
-      if (lowercaseQuery.includes('fatihah') || lowercaseQuery.includes('فاتحة')) {
-        results.push({
-          id: 'surah-1',
-          type: 'surah',
-          title: 'Al-Fatihah',
-          subtitle: 'The Opening',
-          description: '7 verses • Meccan',
-          surahNumber: 1,
-        });
-      }
-
-      setSearchResults(results);
-      setIsLoading(false);
-    }, 800);
-  }, []);
+    
+    // Use the backend API for search
+    searchMutation.mutate({ query: query.trim() });
+  }, [searchMutation]);
 
   const handleVoiceSearch = useCallback(async () => {
     if (isRecording) {
@@ -227,7 +202,8 @@ export default function SearchScreen() {
                 
                 if (transcribedText && transcribedText.trim()) {
                   setSearchQuery(transcribedText);
-                  performSearch(transcribedText);
+                  // Use voice search mutation for better results
+                  voiceSearchMutation.mutate({ transcription: transcribedText });
                 } else {
                   Alert.alert('Voice Search', 'Could not understand the audio. Please try again.');
                 }
