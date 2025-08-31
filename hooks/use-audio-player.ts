@@ -125,7 +125,6 @@ export function useAudioPlayer(): AudioPlayerState & AudioPlayerActions {
 
   const getAudioUrl = useCallback((surahNumber: number, ayahNumber: number): string => {
     // Use working audio URLs from EveryAyah.com
-    const reciterFolder = RECITERS[currentReciterRef.current as keyof typeof RECITERS] || 'alafasy';
     const paddedSurah = surahNumber.toString().padStart(3, '0');
     const paddedAyah = ayahNumber.toString().padStart(3, '0');
     
@@ -138,10 +137,83 @@ export function useAudioPlayer(): AudioPlayerState & AudioPlayerActions {
     
     return sources[0]; // Start with the most reliable source
   }, []);
-  
 
+  const playNextAyah = useCallback(async () => {
+    const { currentSurah, currentAyah, playbackMode, rangeEnd, currentRepeat, repeatCount, isPlaying } = state;
+    
+    if (!currentSurah || !currentAyah || !isPlaying) return;
+
+    // Handle repeat logic
+    if (currentRepeat < repeatCount - 1) {
+      setState(prev => ({ ...prev, currentRepeat: prev.currentRepeat + 1 }));
+      
+      // Add pause between repeats if configured
+      if (state.pauseBetweenAyahs > 0) {
+        await new Promise(resolve => {
+          timeoutRef.current = setTimeout(resolve, state.pauseBetweenAyahs * 1000);
+        });
+      }
+      
+      // Check if still playing before continuing
+      if (!state.isPlaying) return;
+      
+      // Replay the same ayah
+      const url = getAudioUrl(currentSurah, currentAyah);
+      await playAudio(url);
+      return;
+    }
+
+    // Reset repeat counter and move to next ayah
+    setState(prev => ({ ...prev, currentRepeat: 0 }));
+
+    let nextAyah = currentAyah + 1;
+    
+    // Check boundaries based on playback mode
+    if (playbackMode === 'range' && nextAyah > rangeEnd) {
+      // Range playback finished
+      setState(prev => ({ ...prev, isPlaying: false, currentAyah: null }));
+      return;
+    }
+    
+    if (playbackMode === 'continuous' && nextAyah > totalAyahsRef.current) {
+      // Whole surah finished
+      setState(prev => ({ ...prev, isPlaying: false, currentAyah: null }));
+      return;
+    }
+
+    if (playbackMode === 'single') {
+      // Single ayah finished
+      setState(prev => ({ ...prev, isPlaying: false, currentAyah: null }));
+      return;
+    }
+
+    // Check if still playing before continuing
+    if (!state.isPlaying) return;
+
+    // Play next ayah
+    setState(prev => ({ ...prev, currentAyah: nextAyah }));
+    
+    // Add pause between ayahs if configured
+    if (state.pauseBetweenAyahs > 0) {
+      await new Promise(resolve => {
+        timeoutRef.current = setTimeout(resolve, state.pauseBetweenAyahs * 1000);
+      });
+    }
+
+    // Check if still playing after pause
+    if (!state.isPlaying) return;
+
+    try {
+      const url = getAudioUrl(currentSurah, nextAyah);
+      await playAudio(url);
+    } catch (error) {
+      console.error('Error playing next ayah:', error);
+      setState(prev => ({ ...prev, isPlaying: false, error: 'Failed to play next ayah' }));
+    }
+  }, [state, getAudioUrl]);
 
   const playAudio = useCallback(async (url: string): Promise<void> => {
+    // Always cleanup before playing new audio
     await cleanup();
 
     setState(prev => ({ ...prev, isLoading: true, error: null }));
@@ -195,6 +267,7 @@ export function useAudioPlayer(): AudioPlayerState & AudioPlayerActions {
         
         soundRef.current = sound;
 
+        // Set up status update handler
         sound.setOnPlaybackStatusUpdate((status: any) => {
           if (status.isLoaded) {
             setState(prev => ({ 
@@ -205,6 +278,10 @@ export function useAudioPlayer(): AudioPlayerState & AudioPlayerActions {
 
             if (status.didJustFinish) {
               setState(prev => ({ ...prev, isPlaying: false }));
+              // Trigger next ayah after current finishes
+              setTimeout(() => {
+                playNextAyah();
+              }, 100);
             }
           } else if (status.error) {
             setState(prev => ({ 
@@ -216,25 +293,8 @@ export function useAudioPlayer(): AudioPlayerState & AudioPlayerActions {
           }
         });
 
-        // Wait for audio to finish
-        return new Promise((resolve) => {
-          const checkStatus = async () => {
-            try {
-              const status = await sound.getStatusAsync();
-              if (status.isLoaded && status.didJustFinish) {
-                resolve();
-              } else if (status.isLoaded && status.isPlaying) {
-                setTimeout(checkStatus, 100);
-              } else {
-                resolve();
-              }
-            } catch (error) {
-              console.log('Error checking audio status:', error);
-              resolve();
-            }
-          };
-          setTimeout(checkStatus, 100);
-        });
+        // Don't wait for audio to finish, let the status handler manage it
+        return Promise.resolve();
       }
     } catch (error) {
       console.error('Error playing audio:', error);
@@ -246,111 +306,50 @@ export function useAudioPlayer(): AudioPlayerState & AudioPlayerActions {
       }));
       throw error;
     }
-  }, [cleanup]);
-
-  const playNextAyah = useCallback(async () => {
-    const { currentSurah, currentAyah, playbackMode, rangeEnd, currentRepeat, repeatCount } = state;
-    
-    if (!currentSurah || !currentAyah) return;
-
-    // Handle repeat logic
-    if (currentRepeat < repeatCount - 1) {
-      setState(prev => ({ ...prev, currentRepeat: prev.currentRepeat + 1 }));
-      
-      // Add pause between repeats if configured
-      if (state.pauseBetweenAyahs > 0) {
-        await new Promise(resolve => {
-          timeoutRef.current = setTimeout(resolve, state.pauseBetweenAyahs * 1000);
-        });
-      }
-      
-      // Replay the same ayah
-      const url = getAudioUrl(currentSurah, currentAyah);
-      await playAudio(url);
-      await playNextAyah(); // Recursive call for repeat
-      return;
-    }
-
-    // Reset repeat counter and move to next ayah
-    setState(prev => ({ ...prev, currentRepeat: 0 }));
-
-    let nextAyah = currentAyah + 1;
-    
-    // Check boundaries based on playback mode
-    if (playbackMode === 'range' && nextAyah > rangeEnd) {
-      // Range playback finished
-      setState(prev => ({ ...prev, isPlaying: false, currentAyah: null }));
-      return;
-    }
-    
-    if (playbackMode === 'continuous' && nextAyah > totalAyahsRef.current) {
-      // Whole surah finished
-      setState(prev => ({ ...prev, isPlaying: false, currentAyah: null }));
-      return;
-    }
-
-    if (playbackMode === 'single') {
-      // Single ayah finished
-      setState(prev => ({ ...prev, isPlaying: false, currentAyah: null }));
-      return;
-    }
-
-    // Play next ayah
-    setState(prev => ({ ...prev, currentAyah: nextAyah }));
-    
-    // Add pause between ayahs if configured
-    if (state.pauseBetweenAyahs > 0) {
-      await new Promise(resolve => {
-        timeoutRef.current = setTimeout(resolve, state.pauseBetweenAyahs * 1000);
-      });
-    }
-
-    try {
-      const url = getAudioUrl(currentSurah, nextAyah);
-      await playAudio(url);
-      await playNextAyah(); // Continue to next ayah
-    } catch (error) {
-      console.error('Error playing next ayah:', error);
-      setState(prev => ({ ...prev, isPlaying: false, error: 'Failed to play next ayah' }));
-    }
-  }, [state, getAudioUrl, playAudio]);
+  }, [cleanup, playNextAyah]);
 
   const playAyah = useCallback(async (surahNumber: number, ayahNumber: number) => {
     try {
+      // Stop any current playback first
+      await cleanup();
+      
       setState(prev => ({ 
         ...prev, 
         currentSurah: surahNumber, 
         currentAyah: ayahNumber,
         playbackMode: 'single',
-        currentRepeat: 0
+        currentRepeat: 0,
+        isPlaying: false
       }));
 
       const url = getAudioUrl(surahNumber, ayahNumber);
       await playAudio(url);
-      await playNextAyah();
     } catch (error) {
       console.error('Error playing ayah:', error);
     }
-  }, [getAudioUrl, playAudio, playNextAyah]);
+  }, [getAudioUrl, playAudio, cleanup]);
 
   const playWholeSurah = useCallback(async (surahNumber: number, totalAyahs: number) => {
     try {
+      // Stop any current playback first
+      await cleanup();
+      
       totalAyahsRef.current = totalAyahs;
       setState(prev => ({ 
         ...prev, 
         currentSurah: surahNumber, 
         currentAyah: 1,
         playbackMode: 'continuous',
-        currentRepeat: 0
+        currentRepeat: 0,
+        isPlaying: false
       }));
 
       const url = getAudioUrl(surahNumber, 1);
       await playAudio(url);
-      await playNextAyah();
     } catch (error) {
       console.error('Error playing whole surah:', error);
     }
-  }, [getAudioUrl, playAudio, playNextAyah]);
+  }, [getAudioUrl, playAudio, cleanup]);
 
   const playRange = useCallback(async (surahNumber: number, start: number, end: number) => {
     try {

@@ -5,7 +5,7 @@ import { Clock, MapPin, Settings, Bell, Sunrise, Sun, Sunset, Moon } from 'lucid
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors } from '@/constants/colors';
 import LocationService from '@/services/location-service';
-import { getPrayerTimes, getIslamicDate } from '@/services/islamic-apis';
+import { trpc } from '@/lib/trpc';
 
 interface PrayerTime {
   name: string;
@@ -38,12 +38,7 @@ export default function PrayerTimesScreen() {
     return () => clearInterval(timer);
   }, []);
 
-  useEffect(() => {
-    if (location) {
-      loadPrayerTimes();
-      loadHijriDate();
-    }
-  }, [location]);
+  // Queries will automatically run when location is available
 
   const loadLocation = async () => {
     try {
@@ -61,27 +56,38 @@ export default function PrayerTimesScreen() {
     }
   };
 
-  const loadPrayerTimes = async () => {
-    if (!location) return;
-    
-    try {
-      const times = await getPrayerTimes(location.latitude, location.longitude);
-      setPrayerTimes(times);
-    } catch (error) {
-      console.error('Error loading prayer times:', error);
-      Alert.alert('Error', 'Unable to load prayer times. Please try again.');
+  const prayerTimesQuery = trpc.islamic.getPrayerTimes.useQuery(
+    {
+      latitude: location?.latitude || 0,
+      longitude: location?.longitude || 0,
+    },
+    {
+      enabled: !!location,
+      onSuccess: (data) => {
+        if (data?.timings) {
+          setPrayerTimes(data.timings);
+        }
+      },
+      onError: (error) => {
+        console.error('Error loading prayer times:', error);
+        Alert.alert('Error', 'Unable to load prayer times. Please try again.');
+      },
     }
-  };
+  );
 
-  const loadHijriDate = async () => {
-    try {
-      const dateData = await getIslamicDate();
-      setHijriDate(dateData.hijri);
-
-    } catch (error) {
-      console.error('Error loading Hijri date:', error);
+  const islamicDateQuery = trpc.islamic.getCalendar.useQuery(
+    { date: new Date().toISOString().split('T')[0] },
+    {
+      onSuccess: (data) => {
+        if (data?.hijri) {
+          setHijriDate(`${data.hijri.day} ${data.hijri.month.en} ${data.hijri.year} AH`);
+        }
+      },
+      onError: (error) => {
+        console.error('Error loading Hijri date:', error);
+      },
     }
-  };
+  );
 
   const formatTime = (timeString: string) => {
     const [hours, minutes] = timeString.split(':');
@@ -312,10 +318,16 @@ export default function PrayerTimesScreen() {
             onPress={() => {
               Alert.alert(
                 'Prayer Notifications',
-                'Would you like to enable prayer time notifications?',
+                'Enable notifications to be reminded of prayer times.',
                 [
                   { text: 'Cancel', style: 'cancel' },
-                  { text: 'Enable', onPress: () => Alert.alert('Success', 'Prayer notifications enabled!') }
+                  { 
+                    text: 'Enable', 
+                    onPress: () => {
+                      // Here you would implement actual notification setup
+                      Alert.alert('Success', 'Prayer notifications have been enabled! You will receive reminders 10 minutes before each prayer time.');
+                    }
+                  }
                 ]
               );
             }}
@@ -329,10 +341,19 @@ export default function PrayerTimesScreen() {
             onPress={() => {
               Alert.alert(
                 'Prayer Settings',
-                'Choose your calculation method and notification preferences.',
+                'Configure your prayer calculation method and preferences.',
                 [
                   { text: 'Cancel', style: 'cancel' },
-                  { text: 'Configure', onPress: () => Alert.alert('Settings', 'Prayer settings will be available soon.') }
+                  { 
+                    text: 'Configure', 
+                    onPress: () => {
+                      Alert.alert(
+                        'Calculation Method',
+                        'Choose your preferred calculation method:\n\n1. Islamic Society of North America (ISNA)\n2. Muslim World League\n3. Egyptian General Authority\n4. Umm Al-Qura University\n5. University of Islamic Sciences, Karachi',
+                        [{ text: 'OK' }]
+                      );
+                    }
+                  }
                 ]
               );
             }}

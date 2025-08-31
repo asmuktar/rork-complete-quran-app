@@ -66,11 +66,12 @@ export default function SearchScreen() {
       }));
       setSearchResults(results);
       setIsProcessing(false);
+      setHasSearched(true);
     },
     onError: (error) => {
       console.error('Voice search error:', error);
       setIsProcessing(false);
-      Alert.alert('Voice Search Error', 'Failed to process voice search. Please try again.');
+      Alert.alert('Voice Search Error', 'Could not understand the audio. Please try again.');
     },
   });
   
@@ -202,10 +203,12 @@ export default function SearchScreen() {
                 
                 if (transcribedText && transcribedText.trim()) {
                   setSearchQuery(transcribedText);
+                  setHasSearched(true);
                   // Use voice search mutation for better results
                   voiceSearchMutation.mutate({ transcription: transcribedText });
                 } else {
                   Alert.alert('Voice Search', 'Could not understand the audio. Please try again.');
+                  setIsProcessing(false);
                 }
               } else {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -406,14 +409,16 @@ export default function SearchScreen() {
 
       {/* Results */}
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {isLoading && !isRecording && (
+        {(isLoading || isProcessing) && !isRecording && (
           <View style={styles.loadingContainer}>
             <Loader size={32} color={Colors.primary} />
-            <Text style={styles.loadingText}>Searching...</Text>
+            <Text style={styles.loadingText}>
+              {isProcessing ? 'Processing voice...' : 'Searching...'}
+            </Text>
           </View>
         )}
 
-        {!isLoading && !hasSearched && (
+        {!isLoading && !isProcessing && !hasSearched && (
           <View style={styles.placeholderContainer}>
             <View style={styles.placeholderIcon}>
               <Search size={48} color={Colors.textLight} />
@@ -442,7 +447,7 @@ export default function SearchScreen() {
           </View>
         )}
 
-        {!isLoading && hasSearched && searchResults.length === 0 && (
+        {!isLoading && !isProcessing && hasSearched && searchResults.length === 0 && (
           <View style={styles.noResultsContainer}>
             <BookOpen size={48} color={Colors.textLight} />
             <Text style={styles.noResultsTitle}>No results found</Text>
@@ -452,7 +457,7 @@ export default function SearchScreen() {
           </View>
         )}
 
-        {!isLoading && searchResults.length > 0 && (
+        {!isLoading && !isProcessing && searchResults.length > 0 && (
           <View style={styles.resultsContainer}>
             <Text style={styles.resultsHeader}>
               {searchResults.length} result{searchResults.length !== 1 ? 's' : ''} found
