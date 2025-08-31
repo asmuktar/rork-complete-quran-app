@@ -63,31 +63,39 @@ export default function PrayerTimesScreen() {
     },
     {
       enabled: !!location,
-      onSuccess: (data) => {
-        if (data?.timings) {
-          setPrayerTimes(data.timings);
-        }
-      },
-      onError: (error) => {
-        console.error('Error loading prayer times:', error);
-        Alert.alert('Error', 'Unable to load prayer times. Please try again.');
-      },
     }
   );
 
-  const islamicDateQuery = trpc.islamic.getCalendar.useQuery(
-    { date: new Date().toISOString().split('T')[0] },
-    {
-      onSuccess: (data) => {
-        if (data?.hijri) {
-          setHijriDate(`${data.hijri.day} ${data.hijri.month.en} ${data.hijri.year} AH`);
-        }
-      },
-      onError: (error) => {
-        console.error('Error loading Hijri date:', error);
-      },
+  // Handle prayer times query success/error
+  useEffect(() => {
+    if (prayerTimesQuery.data?.timings) {
+      setPrayerTimes(prayerTimesQuery.data.timings);
     }
+  }, [prayerTimesQuery.data]);
+
+  useEffect(() => {
+    if (prayerTimesQuery.error) {
+      console.error('Error loading prayer times:', prayerTimesQuery.error);
+      Alert.alert('Error', 'Unable to load prayer times. Please try again.');
+    }
+  }, [prayerTimesQuery.error]);
+
+  const islamicDateQuery = trpc.islamic.getCalendar.useQuery(
+    { date: new Date().toISOString().split('T')[0] }
   );
+
+  // Handle islamic date query success/error
+  useEffect(() => {
+    if (islamicDateQuery.data?.hijri) {
+      setHijriDate(`${islamicDateQuery.data.hijri.day} ${islamicDateQuery.data.hijri.month.en} ${islamicDateQuery.data.hijri.year} AH`);
+    }
+  }, [islamicDateQuery.data]);
+
+  useEffect(() => {
+    if (islamicDateQuery.error) {
+      console.error('Error loading Hijri date:', islamicDateQuery.error);
+    }
+  }, [islamicDateQuery.error]);
 
   const formatTime = (timeString: string) => {
     const [hours, minutes] = timeString.split(':');
