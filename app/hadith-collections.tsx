@@ -98,15 +98,15 @@ const SAMPLE_HADITHS = [
 
 export default function HadithCollectionsScreen() {
   const handleCollectionPress = (collectionId: string) => {
-    Alert.alert('Coming Soon', `${collectionId} collection will be available soon.`);
+    router.push(`/hadith-collection/${collectionId}`);
   };
 
   const handleVerifyHadith = () => {
-    Alert.alert('Verify Hadith', 'Hadith verification feature will be available soon.');
+    router.push('/verify-hadith');
   };
 
   const handleAdvancedSearch = () => {
-    Alert.alert('Advanced Search', 'Advanced hadith search feature will be available soon.');
+    router.push('/advanced-hadith-search');
   };
 
   const getStatusColor = (status: string) => {

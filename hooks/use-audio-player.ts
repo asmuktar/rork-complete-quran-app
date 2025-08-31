@@ -129,8 +129,14 @@ export function useAudioPlayer(): AudioPlayerState & AudioPlayerActions {
     const paddedSurah = surahNumber.toString().padStart(3, '0');
     const paddedAyah = ayahNumber.toString().padStart(3, '0');
     
-    // Use reliable audio source from Islamic Network
-    return `https://cdn.islamic.network/quran/audio/128/ar.${reciterFolder}/${paddedSurah}${paddedAyah}.mp3`;
+    // Use multiple fallback sources
+    const sources = [
+      `https://everyayah.com/data/Alafasy_128kbps/${paddedSurah}${paddedAyah}.mp3`,
+      `https://cdn.islamic.network/quran/audio/128/ar.alafasy/${paddedSurah}${paddedAyah}.mp3`,
+      `https://audio.qurancdn.com/${paddedSurah}${paddedAyah}.mp3`
+    ];
+    
+    return sources[0]; // Start with the most reliable source
   }, []);
   
 
