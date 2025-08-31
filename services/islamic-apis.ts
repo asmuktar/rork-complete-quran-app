@@ -37,40 +37,63 @@ export async function getQiblaDirection(
   latitude: number,
   longitude: number
 ): Promise<{ direction: number; distance: number }> {
-  // Kaaba coordinates (more precise)
-  const meccaLat = 21.422487;
-  const meccaLng = 39.826206;
+  // Kaaba coordinates (most precise available)
+  const meccaLat = 21.4224779;
+  const meccaLng = 39.8251832;
   
   try {
-    // Try API first
-    const response = await fetch(
-      `https://api.aladhan.com/v1/qibla/${latitude}/${longitude}`
-    );
+    // Try multiple APIs for better reliability
+    const apiUrls = [
+      `https://api.aladhan.com/v1/qibla/${latitude}/${longitude}`,
+      `https://api.pray.zone/v2/times/today.json?latitude=${latitude}&longitude=${longitude}`,
+    ];
     
-    if (response.ok) {
-      const data = await response.json();
-      
-      if (data.data && data.data.direction !== undefined) {
-        const distance = calculateDistance(latitude, longitude, meccaLat, meccaLng);
+    for (const url of apiUrls) {
+      try {
+        const response = await fetch(url, {
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+          },
+        });
         
-        return {
-          direction: parseFloat(data.data.direction),
-          distance: Math.round(distance)
-        };
+        if (response.ok) {
+          const data = await response.json();
+          
+          // Handle different API response formats
+          let qiblaDirection;
+          if (data.data && data.data.direction !== undefined) {
+            qiblaDirection = parseFloat(data.data.direction);
+          } else if (data.results && data.results.qibla_direction !== undefined) {
+            qiblaDirection = parseFloat(data.results.qibla_direction);
+          }
+          
+          if (qiblaDirection !== undefined && !isNaN(qiblaDirection)) {
+            const distance = calculateDistance(latitude, longitude, meccaLat, meccaLng);
+            
+            return {
+              direction: Math.round(qiblaDirection * 10) / 10,
+              distance: Math.round(distance)
+            };
+          }
+        }
+      } catch (apiError) {
+        console.log('API attempt failed:', apiError);
+        continue; // Try next API
       }
     }
     
-    // Fallback to manual calculation if API fails
-    throw new Error('API failed, using fallback calculation');
+    // All APIs failed, use manual calculation
+    throw new Error('All API attempts failed');
   } catch (error) {
-    console.log('Using fallback Qibla calculation:', error);
+    console.log('Using manual Qibla calculation:', error);
     
-    // Manual calculation using great circle bearing
+    // Enhanced manual calculation using great circle bearing
     const direction = calculateBearing(latitude, longitude, meccaLat, meccaLng);
     const distance = calculateDistance(latitude, longitude, meccaLat, meccaLng);
     
     return {
-      direction: Math.round(direction * 10) / 10, // Round to 1 decimal place
+      direction: Math.round(direction * 10) / 10,
       distance: Math.round(distance)
     };
   }
@@ -88,16 +111,23 @@ function calculateDistance(lat1: number, lng1: number, lat2: number, lng2: numbe
 }
 
 function calculateBearing(lat1: number, lng1: number, lat2: number, lng2: number): number {
-  const dLng = (lng2 - lng1) * Math.PI / 180;
+  // Convert degrees to radians
   const lat1Rad = lat1 * Math.PI / 180;
   const lat2Rad = lat2 * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
   
+  // Calculate bearing using the forward azimuth formula
   const y = Math.sin(dLng) * Math.cos(lat2Rad);
-  const x = Math.cos(lat1Rad) * Math.sin(lat2Rad) - Math.sin(lat1Rad) * Math.cos(lat2Rad) * Math.cos(dLng);
+  const x = Math.cos(lat1Rad) * Math.sin(lat2Rad) - 
+            Math.sin(lat1Rad) * Math.cos(lat2Rad) * Math.cos(dLng);
   
-  let bearing = Math.atan2(y, x) * 180 / Math.PI;
-  // Normalize to 0-360 degrees
+  // Calculate initial bearing in radians
+  let bearing = Math.atan2(y, x);
+  
+  // Convert to degrees and normalize to 0-360
+  bearing = bearing * 180 / Math.PI;
   bearing = (bearing + 360) % 360;
+  
   return bearing;
 }
 

@@ -170,30 +170,31 @@ export function useAudioPlayer(): AudioPlayerState & AudioPlayerActions {
         
         soundRef.current = sound;
 
-        // Set up status update handler
-        sound.setOnPlaybackStatusUpdate((status: any) => {
-          if (status.isLoaded) {
-            setState(prev => ({ 
-              ...prev, 
-              isLoading: false,
-              isPlaying: status.isPlaying || false 
-            }));
+        // Wait for the sound to finish playing
+        return new Promise((resolve) => {
+          sound.setOnPlaybackStatusUpdate((status: any) => {
+            if (status.isLoaded) {
+              setState(prev => ({ 
+                ...prev, 
+                isLoading: false,
+                isPlaying: status.isPlaying || false 
+              }));
 
-            if (status.didJustFinish) {
-              setState(prev => ({ ...prev, isPlaying: false }));
+              if (status.didJustFinish) {
+                setState(prev => ({ ...prev, isPlaying: false }));
+                resolve();
+              }
+            } else if (status.error) {
+              setState(prev => ({ 
+                ...prev, 
+                isLoading: false, 
+                isPlaying: false,
+                error: `Audio error: ${status.error}` 
+              }));
+              resolve();
             }
-          } else if (status.error) {
-            setState(prev => ({ 
-              ...prev, 
-              isLoading: false, 
-              isPlaying: false,
-              error: `Audio error: ${status.error}` 
-            }));
-          }
+          });
         });
-
-        // Don't wait for audio to finish, let the status handler manage it
-        return Promise.resolve();
       }
     } catch (error) {
       console.error('Error playing audio:', error);
@@ -318,49 +319,34 @@ export function useAudioPlayer(): AudioPlayerState & AudioPlayerActions {
         currentAyah: 1,
         playbackMode: 'continuous',
         currentRepeat: 0,
-        isPlaying: false
+        isPlaying: true
       }));
 
-      const url = getAudioUrl(surahNumber, 1);
-      await playAudio(url);
-      
-      // Set up continuous playback
-      if (Platform.OS === 'web') {
-        if (webAudioRef.current) {
-          webAudioRef.current.onended = () => {
-            setState(prev => ({ ...prev, isPlaying: false }));
-            playNextAyah();
-          };
-        }
-      } else {
-        if (soundRef.current) {
-          soundRef.current.setOnPlaybackStatusUpdate((status: any) => {
-            if (status.isLoaded) {
-              setState(prev => ({ 
-                ...prev, 
-                isLoading: false,
-                isPlaying: status.isPlaying || false 
-              }));
-
-              if (status.didJustFinish) {
-                setState(prev => ({ ...prev, isPlaying: false }));
-                playNextAyah();
-              }
-            } else if (status.error) {
-              setState(prev => ({ 
-                ...prev, 
-                isLoading: false, 
-                isPlaying: false,
-                error: `Audio error: ${status.error}` 
-              }));
-            }
+      // Play ayahs sequentially
+      for (let ayah = 1; ayah <= totalAyahs; ayah++) {
+        // Check if playback was stopped
+        const currentState = state;
+        if (!currentState.isPlaying) break;
+        
+        setState(prev => ({ ...prev, currentAyah: ayah }));
+        
+        const url = getAudioUrl(surahNumber, ayah);
+        await playAudio(url);
+        
+        // Add pause between ayahs if configured
+        if (state.pauseBetweenAyahs > 0 && ayah < totalAyahs) {
+          await new Promise(resolve => {
+            timeoutRef.current = setTimeout(resolve, state.pauseBetweenAyahs * 1000);
           });
         }
       }
+      
+      setState(prev => ({ ...prev, isPlaying: false, currentAyah: null }));
     } catch (error) {
       console.error('Error playing whole surah:', error);
+      setState(prev => ({ ...prev, isPlaying: false, currentAyah: null }));
     }
-  }, [getAudioUrl, playAudio, cleanup, playNextAyah]);
+  }, [getAudioUrl, playAudio, cleanup, state]);
 
   const playRange = useCallback(async (surahNumber: number, start: number, end: number) => {
     try {

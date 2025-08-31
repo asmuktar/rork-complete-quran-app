@@ -222,7 +222,7 @@ export default function HadithScreen() {
             <TouchableOpacity
               key={collection.id}
               style={styles.collectionCard}
-              onPress={() => router.push('/hadith-collections')}
+              onPress={() => router.push(`/hadith-collection/${collection.id}` as any)}
               activeOpacity={0.8}
             >
               <View style={styles.collectionIcon}>
