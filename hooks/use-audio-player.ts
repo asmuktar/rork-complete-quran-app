@@ -124,15 +124,14 @@ export function useAudioPlayer(): AudioPlayerState & AudioPlayerActions {
   }, [cleanup]);
 
   const getAudioUrl = useCallback((surahNumber: number, ayahNumber: number): string => {
-    // Use Al-Quran Cloud API for reliable audio URLs
-    const reciterIdentifier = 'ar.alafasy'; // Mishary Alafasy
-    return `https://cdn.islamic.network/quran/audio/128/${reciterIdentifier}/${surahNumber}/${ayahNumber}.mp3`;
+    // Use working audio URLs from EveryAyah.com
+    const reciterFolder = RECITERS[currentReciterRef.current as keyof typeof RECITERS] || 'Alafasy_128kbps';
+    const paddedSurah = surahNumber.toString().padStart(3, '0');
+    const paddedAyah = ayahNumber.toString().padStart(3, '0');
+    return `https://everyayah.com/data/${reciterFolder}/${paddedSurah}${paddedAyah}.mp3`;
   }, []);
   
-  const getSurahAudioUrl = useCallback((surahNumber: number): string => {
-    // For whole surah playback, we'll use the first ayah and continue sequentially
-    return getAudioUrl(surahNumber, 1);
-  }, [getAudioUrl]);
+
 
   const playAudio = useCallback(async (url: string): Promise<void> => {
     await cleanup();

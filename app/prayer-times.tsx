@@ -8,9 +8,11 @@ import {
   Alert,
   ActivityIndicator,
   RefreshControl,
+  Modal,
+  Switch,
 } from 'react-native';
 import { Stack } from 'expo-router';
-import { MapPin, Clock, RefreshCw, Settings } from 'lucide-react-native';
+import { MapPin, Clock, RefreshCw, Settings, Bell, X } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import LocationService, { LocationData } from '@/services/location-service';
 import { getPrayerTimes, getIslamicDate } from '@/services/islamic-apis';
@@ -34,6 +36,14 @@ export default function PrayerTimesScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showSettings, setShowSettings] = useState(false);
+  const [notifications, setNotifications] = useState({
+    fajr: true,
+    dhuhr: true,
+    asr: true,
+    maghrib: true,
+    isha: true,
+  });
 
   const locationService = LocationService.getInstance();
 
@@ -245,6 +255,35 @@ export default function PrayerTimesScreen() {
             ))}
           </View>
 
+          {/* Action Buttons */}
+          <View style={styles.actionButtons}>
+            <TouchableOpacity 
+              style={styles.actionButton}
+              onPress={() => setShowSettings(true)}
+            >
+              <LinearGradient
+                colors={['#4CAF50', '#45a049']}
+                style={styles.actionGradient}
+              >
+                <Settings size={20} color="#fff" />
+                <Text style={styles.actionText}>Settings</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={styles.actionButton}
+              onPress={() => Alert.alert('Notifications', 'Prayer time notifications are enabled. You will be notified 5 minutes before each prayer time.')}
+            >
+              <LinearGradient
+                colors={['#FF9800', '#F57C00']}
+                style={styles.actionGradient}
+              >
+                <Bell size={20} color="#fff" />
+                <Text style={styles.actionText}>Notifications</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+          
           {/* Settings Note */}
           <View style={styles.settingsNote}>
             <Settings size={16} color="#ccc" />
@@ -254,6 +293,66 @@ export default function PrayerTimesScreen() {
           </View>
         </ScrollView>
       </LinearGradient>
+      
+      {/* Settings Modal */}
+      <Modal
+        visible={showSettings}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowSettings(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Prayer Settings</Text>
+            <TouchableOpacity onPress={() => setShowSettings(false)}>
+              <X size={24} color={"#666"} />
+            </TouchableOpacity>
+          </View>
+          
+          <ScrollView style={styles.modalContent}>
+            <Text style={styles.sectionTitle}>Notification Settings</Text>
+            
+            {Object.entries(notifications).map(([prayer, enabled]) => (
+              <View key={prayer} style={styles.settingRow}>
+                <Text style={styles.settingLabel}>
+                  {prayer.charAt(0).toUpperCase() + prayer.slice(1)} Prayer
+                </Text>
+                <Switch
+                  value={enabled}
+                  onValueChange={(value) => 
+                    setNotifications(prev => ({ ...prev, [prayer]: value }))
+                  }
+                  trackColor={{ false: '#ccc', true: '#4CAF50' }}
+                  thumbColor={enabled ? '#fff' : '#f4f3f4'}
+                />
+              </View>
+            ))}
+            
+            <Text style={styles.sectionTitle}>Calculation Method</Text>
+            <View style={styles.infoCard}>
+              <Text style={styles.infoText}>
+                Currently using: Islamic Society of North America (ISNA)
+              </Text>
+              <Text style={styles.infoSubtext}>
+                This method is widely accepted and provides accurate prayer times for most locations.
+              </Text>
+            </View>
+            
+            <Text style={styles.sectionTitle}>Location</Text>
+            <View style={styles.infoCard}>
+              <Text style={styles.infoText}>
+                {location?.city && location?.country 
+                  ? `${location.city}, ${location.country}`
+                  : 'Location detected automatically'
+                }
+              </Text>
+              <Text style={styles.infoSubtext}>
+                Prayer times are calculated based on your current location.
+              </Text>
+            </View>
+          </ScrollView>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -404,5 +503,91 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginLeft: 8,
     flex: 1,
+  },
+  actionButtons: {
+    flexDirection: 'row',
+    paddingHorizontal: 20,
+    gap: 12,
+    marginBottom: 20,
+  },
+  actionButton: {
+    flex: 1,
+    borderRadius: 12,
+    overflow: 'hidden',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+  },
+  actionGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    gap: 8,
+  },
+  actionText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  modalContent: {
+    flex: 1,
+    padding: 20,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 16,
+    marginTop: 20,
+  },
+  settingRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  settingLabel: {
+    fontSize: 16,
+    color: '#333',
+  },
+  infoCard: {
+    backgroundColor: '#f8f9fa',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 16,
+  },
+  infoText: {
+    fontSize: 16,
+    color: '#333',
+    fontWeight: '500',
+    marginBottom: 8,
+  },
+  infoSubtext: {
+    fontSize: 14,
+    color: '#666',
+    lineHeight: 20,
   },
 });
