@@ -30,17 +30,22 @@ export default function ReciterDetailScreen() {
 
   const handlePlaySample = async () => {
     try {
-      if (isPlaying) {
+      if (isPlaying || audioPlayer.isPlaying) {
         await audioPlayer.stopPlayback();
         setIsPlaying(false);
       } else {
+        setIsPlaying(true);
+        // Set the reciter first
+        audioPlayer.setReciter(reciterId);
         // Play Al-Fatihah verse 1 as sample
         await audioPlayer.playAyah(1, 1);
-        setIsPlaying(true);
+        // Reset playing state when done
+        setTimeout(() => setIsPlaying(false), 3000);
       }
     } catch (error) {
       console.error('Error playing sample:', error);
       Alert.alert('Error', 'Failed to play sample audio');
+      setIsPlaying(false);
     }
   };
 
@@ -104,7 +109,7 @@ export default function ReciterDetailScreen() {
               <Play size={20} color={Colors.textOnPrimary} />
             )}
             <Text style={styles.primaryButtonText}>
-              {isPlaying ? 'Stop Sample' : 'Play Sample'}
+              {isPlaying || audioPlayer.isPlaying ? 'Stop Sample' : 'Play Sample'}
             </Text>
           </LinearGradient>
         </TouchableOpacity>

@@ -74,29 +74,9 @@ export default function RecitersScreen() {
             
             <TouchableOpacity 
               style={[styles.playButton, isTopThree && styles.topPlayButton]}
-              onPress={async (e) => {
+              onPress={(e) => {
                 e.stopPropagation();
-                try {
-                  // Play Al-Fatihah verse 1 as sample
-                  const { Audio } = await import('expo-av');
-                  const sampleUrl = `https://everyayah.com/data/Alafasy_128kbps/001001.mp3`;
-                  
-                  const { sound } = await Audio.Sound.createAsync(
-                    { uri: sampleUrl },
-                    { shouldPlay: true }
-                  );
-                  
-                  // Clean up after 10 seconds
-                  setTimeout(async () => {
-                    try {
-                      await sound.unloadAsync();
-                    } catch (error) {
-                      console.log('Error unloading sample:', error);
-                    }
-                  }, 10000);
-                } catch (error) {
-                  console.error('Error playing sample:', error);
-                }
+                handleReciterPress(reciter.id);
               }}
             >
               <Volume2 size={20} color={isTopThree ? Colors.textOnPrimary : Colors.primary} />

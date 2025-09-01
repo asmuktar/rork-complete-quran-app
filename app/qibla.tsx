@@ -5,7 +5,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Compass, MapPin, Navigation, RefreshCw } from 'lucide-react-native';
 import { Colors } from '@/constants/colors';
 import { getLocation } from '@/services/location-service';
-import { getQiblaDirection } from '@/services/islamic-apis';
+import { trpc } from '@/lib/trpc';
 
 const { width } = Dimensions.get('window');
 
@@ -26,7 +26,7 @@ export default function QiblaScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const loadQiblaDirection = async () => {
+  const loadLocation = async () => {
     setLoading(true);
     setError(null);
     
@@ -40,18 +40,9 @@ export default function QiblaScreen() {
 
       console.log('Location obtained:', locationData);
       setLocation(locationData);
-
-      // Get Qibla direction from API
-      const qiblaDirection = await getQiblaDirection(
-        locationData.latitude,
-        locationData.longitude
-      );
-
-      console.log('Qibla direction fetched:', qiblaDirection);
-      setQiblaData(qiblaDirection);
     } catch (err) {
-      console.error('Error getting Qibla direction:', err);
-      const errorMessage = err instanceof Error ? err.message : 'Failed to get Qibla direction';
+      console.error('Error getting location:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Failed to get location';
       setError(errorMessage);
       
       Alert.alert(
@@ -59,7 +50,7 @@ export default function QiblaScreen() {
         'Unable to get your location. Please check your location permissions and try again.',
         [
           { text: 'OK' },
-          { text: 'Retry', onPress: loadQiblaDirection }
+          { text: 'Retry', onPress: loadLocation }
         ]
       );
     } finally {
@@ -67,8 +58,35 @@ export default function QiblaScreen() {
     }
   };
 
+  const qiblaQuery = trpc.islamic.getQibla.useQuery(
+    {
+      latitude: location?.latitude || 0,
+      longitude: location?.longitude || 0,
+    },
+    {
+      enabled: !!location,
+      retry: 2,
+    }
+  );
+
   useEffect(() => {
-    loadQiblaDirection();
+    if (qiblaQuery.data) {
+      setQiblaData({
+        direction: qiblaQuery.data.direction,
+        distance: qiblaQuery.data.distance
+      });
+    }
+  }, [qiblaQuery.data]);
+
+  useEffect(() => {
+    if (qiblaQuery.error) {
+      console.error('Error loading qibla direction:', qiblaQuery.error);
+      setError('Failed to calculate Qibla direction');
+    }
+  }, [qiblaQuery.error]);
+
+  useEffect(() => {
+    loadLocation();
   }, []);
 
   const formatDirection = (degrees: number): string => {
@@ -177,7 +195,7 @@ export default function QiblaScreen() {
             </View>
             <Text style={styles.errorTitle}>Location Error</Text>
             <Text style={styles.errorText}>{error}</Text>
-            <TouchableOpacity style={styles.retryButton} onPress={loadQiblaDirection}>
+            <TouchableOpacity style={styles.retryButton} onPress={loadLocation}>
               <LinearGradient
                 colors={Colors.gradients.primary as [string, string]}
                 style={styles.retryGradient}

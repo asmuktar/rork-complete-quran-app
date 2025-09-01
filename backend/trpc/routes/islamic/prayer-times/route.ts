@@ -64,53 +64,39 @@ export const getQiblaProcedure = publicProcedure
   }))
   .query(async ({ input }) => {
     try {
-      const response = await fetch(
-        `${PRAYER_API_BASE}/qibla/${input.latitude}/${input.longitude}`
-      );
+      // Most accurate Kaaba coordinates (from Saudi Survey)
+      const kaabaLat = 21.422487;
+      const kaabaLng = 39.826206;
       
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
+      // Use enhanced manual calculation for better accuracy
+      const φ1 = input.latitude * Math.PI / 180;
+      const φ2 = kaabaLat * Math.PI / 180;
+      const Δλ = (kaabaLng - input.longitude) * Math.PI / 180;
       
-      const data = await response.json();
+      // Forward azimuth calculation using spherical trigonometry
+      const y = Math.sin(Δλ) * Math.cos(φ2);
+      const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
       
-      if (data.code !== 200) {
-        throw new Error(data.status || 'API returned error');
-      }
+      const θ = Math.atan2(y, x);
+      const bearing = (θ * 180 / Math.PI + 360) % 360;
       
-      return data.data || null;
-    } catch (error) {
-      console.error('Error fetching qibla direction:', error);
-      
-      // Calculate qibla direction manually as fallback
-      const kaabahLat = 21.4225; // Kaaba latitude
-      const kaabahLng = 39.8262; // Kaaba longitude
-      
-      const lat1 = input.latitude * Math.PI / 180;
-      const lat2 = kaabahLat * Math.PI / 180;
-      const deltaLng = (kaabahLng - input.longitude) * Math.PI / 180;
-      
-      const y = Math.sin(deltaLng) * Math.cos(lat2);
-      const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(deltaLng);
-      
-      let bearing = Math.atan2(y, x) * 180 / Math.PI;
-      bearing = (bearing + 360) % 360; // Normalize to 0-360
-      
-      // Calculate distance to Kaaba
-      const R = 6371; // Earth's radius in km
-      const dLat = (kaabahLat - input.latitude) * Math.PI / 180;
-      const dLng = deltaLng;
-      const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-                Math.cos(lat1) * Math.cos(lat2) *
-                Math.sin(dLng/2) * Math.sin(dLng/2);
+      // Calculate distance using Haversine formula
+      const R = 6371.0088; // Earth's mean radius in km
+      const Δφ = (kaabaLat - input.latitude) * Math.PI / 180;
+      const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+                Math.cos(φ1) * Math.cos(φ2) *
+                Math.sin(Δλ/2) * Math.sin(Δλ/2);
       const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
       const distance = R * c;
       
       return {
         latitude: input.latitude,
         longitude: input.longitude,
-        direction: bearing,
-        distance: Math.round(distance * 100) / 100 // Round to 2 decimal places
+        direction: Math.round(bearing * 100) / 100,
+        distance: Math.round(distance * 100) / 100
       };
+    } catch (error) {
+      console.error('Error calculating qibla direction:', error);
+      throw new Error('Failed to calculate Qibla direction');
     }
   });

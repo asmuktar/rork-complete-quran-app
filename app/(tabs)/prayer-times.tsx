@@ -81,7 +81,11 @@ export default function PrayerTimesScreen() {
   }, [prayerTimesQuery.error]);
 
   const islamicDateQuery = trpc.islamic.getCalendar.useQuery(
-    { date: new Date().toISOString().split('T')[0] }
+    { date: new Date().toISOString().split('T')[0] },
+    {
+      retry: 1,
+      refetchOnWindowFocus: false,
+    }
   );
 
   // Handle islamic date query success/error

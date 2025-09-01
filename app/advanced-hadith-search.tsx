@@ -41,8 +41,8 @@ export default function AdvancedHadithSearchScreen() {
       setIsLoading(true);
       setHasSearched(false);
       
-      // Mock search results for now
-      const mockResults: HadithResult[] = [
+      // Enhanced mock search results with more variety
+      const allMockResults: HadithResult[] = [
         {
           id: 1,
           arab: 'إِنَّمَا الأَعْمَالُ بِالنِّيَّاتِ، وَإِنَّمَا لِكُلِّ امْرِئٍ مَا نَوَى',
@@ -59,16 +59,80 @@ export default function AdvancedHadithSearchScreen() {
           narrator: 'Abdullah ibn Umar',
           grade: 'Sahih',
           collection: 'Sahih Muslim',
-          reference: 'Book 1, Hadith 1'
+          reference: 'Book 1, Hadith 8'
+        },
+        {
+          id: 3,
+          arab: 'مَنْ كَانَ يُؤْمِنُ بِاللَّهِ وَالْيَوْمِ الآخِرِ فَلْيَقُلْ خَيْرًا أَوْ لِيَصْمُتْ',
+          translation: 'Whoever believes in Allah and the Last Day should speak good or remain silent.',
+          narrator: 'Abu Hurairah',
+          grade: 'Sahih',
+          collection: 'Sahih al-Bukhari',
+          reference: 'Book 78, Hadith 136'
+        },
+        {
+          id: 4,
+          arab: 'الْمُسْلِمُ مَنْ سَلِمَ الْمُسْلِمُونَ مِنْ لِسَانِهِ وَيَدِهِ',
+          translation: 'A Muslim is one from whose tongue and hand the Muslims are safe.',
+          narrator: 'Abdullah ibn Amr',
+          grade: 'Sahih',
+          collection: 'Sahih Muslim',
+          reference: 'Book 1, Hadith 65'
+        },
+        {
+          id: 5,
+          arab: 'لاَ يُؤْمِنُ أَحَدُكُمْ حَتَّى يُحِبَّ لأَخِيهِ مَا يُحِبُّ لِنَفْسِهِ',
+          translation: 'None of you believes until he loves for his brother what he loves for himself.',
+          narrator: 'Anas ibn Malik',
+          grade: 'Sahih',
+          collection: 'Sahih al-Bukhari',
+          reference: 'Book 2, Hadith 12'
+        },
+        {
+          id: 6,
+          arab: 'الدِّينُ النَّصِيحَةُ',
+          translation: 'Religion is sincere advice.',
+          narrator: 'Tamim ad-Dari',
+          grade: 'Sahih',
+          collection: 'Sahih Muslim',
+          reference: 'Book 1, Hadith 95'
+        },
+        {
+          id: 7,
+          arab: 'مَنْ صَلَّى الْبَرْدَيْنِ دَخَلَ الْجَنَّةَ',
+          translation: 'Whoever prays the two cool prayers (Fajr and Asr) will enter Paradise.',
+          narrator: 'Abu Musa al-Ashari',
+          grade: 'Sahih',
+          collection: 'Sahih al-Bukhari',
+          reference: 'Book 9, Hadith 41'
+        },
+        {
+          id: 8,
+          arab: 'الطَّهُورُ شَطْرُ الإِيمَانِ',
+          translation: 'Cleanliness is half of faith.',
+          narrator: 'Abu Malik al-Ashari',
+          grade: 'Sahih',
+          collection: 'Sahih Muslim',
+          reference: 'Book 2, Hadith 1'
         }
       ];
       
-      // Filter results based on query
-      const filteredResults = mockResults.filter(hadith => 
-        hadith.translation.toLowerCase().includes(query.toLowerCase()) ||
-        hadith.arab.includes(query) ||
-        hadith.narrator.toLowerCase().includes(query.toLowerCase())
-      );
+      // Filter results based on query and collection
+      let filteredResults = allMockResults.filter(hadith => {
+        const matchesQuery = hadith.translation.toLowerCase().includes(query.toLowerCase()) ||
+                           hadith.arab.includes(query) ||
+                           hadith.narrator.toLowerCase().includes(query.toLowerCase());
+        
+        const matchesCollection = !filters.collection || 
+                                 hadith.collection.toLowerCase().includes(filters.collection.toLowerCase());
+        
+        const matchesGrade = !filters.grade || hadith.grade === filters.grade;
+        
+        return matchesQuery && matchesCollection && matchesGrade;
+      });
+      
+      // Simulate network delay
+      await new Promise(resolve => setTimeout(resolve, 800));
       
       setSearchResults(filteredResults);
       setIsLoading(false);
@@ -76,6 +140,7 @@ export default function AdvancedHadithSearchScreen() {
     } catch (error) {
       console.error('Search error:', error);
       setIsLoading(false);
+      setHasSearched(true);
       Alert.alert('Search Error', 'Failed to search hadiths. Please try again.');
     }
   };
@@ -254,15 +319,20 @@ export default function AdvancedHadithSearchScreen() {
               {searchResults.length} hadith{searchResults.length !== 1 ? 's' : ''} found
             </Text>
             {searchResults.map((hadith, index) => (
-              <View key={index} style={styles.hadithCard}>
+              <View key={hadith.id} style={styles.hadithCard}>
                 <View style={styles.hadithHeader}>
                   <View style={styles.hadithMeta}>
-                    <Text style={styles.hadithCollection}>{hadith.collection || 'Sahih Bukhari'}</Text>
-                    <View style={styles.gradeBadge}>
-                      <Text style={styles.gradeText}>{hadith.grade || 'Sahih'}</Text>
+                    <Text style={styles.hadithCollection}>{hadith.collection}</Text>
+                    <View style={[
+                      styles.gradeBadge,
+                      hadith.grade === 'Sahih' && styles.sahihBadge,
+                      hadith.grade === 'Hasan' && styles.hasanBadge,
+                      hadith.grade === 'Daif' && styles.daifBadge
+                    ]}>
+                      <Text style={styles.gradeText}>{hadith.grade}</Text>
                     </View>
                   </View>
-                  <Text style={styles.hadithReference}>{hadith.reference || 'Book 1, Hadith 1'}</Text>
+                  <Text style={styles.hadithReference}>{hadith.reference}</Text>
                 </View>
 
                 <Text style={styles.hadithArabic}>{hadith.arab}</Text>
@@ -508,10 +578,18 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   gradeBadge: {
-    backgroundColor: Colors.success,
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 10,
+  },
+  sahihBadge: {
+    backgroundColor: Colors.success,
+  },
+  hasanBadge: {
+    backgroundColor: '#f59e0b',
+  },
+  daifBadge: {
+    backgroundColor: '#ef4444',
   },
   gradeText: {
     fontSize: 10,
