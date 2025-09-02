@@ -31,7 +31,7 @@ export default function QiblaScreen() {
   const [error, setError] = useState<string | null>(null);
   const [deviceHeading, setDeviceHeading] = useState<number>(0);
   const [isCalibrated, setIsCalibrated] = useState<boolean>(false);
-  const [compassEnabled, setCompassEnabled] = useState<boolean>(true);
+  const [compassEnabled, setCompassEnabled] = useState<boolean>(true); // Live mode enabled by default
   
   const magnetometerSubscription = useRef<Subscription | null>(null);
   const calibrationTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -98,7 +98,10 @@ export default function QiblaScreen() {
   useEffect(() => {
     const initializeQibla = async () => {
       await loadLocation();
-      await startMagnetometer();
+      // Ensure live mode is active by starting magnetometer immediately
+      if (compassEnabled) {
+        await startMagnetometer();
+      }
     };
     
     initializeQibla();
@@ -110,6 +113,15 @@ export default function QiblaScreen() {
       }
     };
   }, []);
+
+  // Restart magnetometer when compass mode changes
+  useEffect(() => {
+    if (compassEnabled) {
+      startMagnetometer();
+    } else {
+      stopMagnetometer();
+    }
+  }, [compassEnabled]);
 
   const startMagnetometer = async () => {
     if (Platform.OS === 'web') {
