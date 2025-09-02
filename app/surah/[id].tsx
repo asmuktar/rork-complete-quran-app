@@ -17,14 +17,21 @@ export default function SurahScreen() {
   
   const [showSettings, setShowSettings] = useState(false);
   const [bookmarkedAyahs, setBookmarkedAyahs] = useState<Set<number>>(new Set());
-  const [selectedReciter, setSelectedReciter] = useState('almatroud');
+  const [selectedReciter, setSelectedReciter] = useState('mishary-alafasy');
   const [showTransliteration, setShowTransliteration] = useState(false);
+  const [showReciterSelection, setShowReciterSelection] = useState(false);
   
   const audioPlayer = useAudioPlayer();
   
   useEffect(() => {
     audioPlayer.setReciter(selectedReciter);
   }, [selectedReciter, audioPlayer]);
+  
+  const handleReciterChange = (reciterId: string) => {
+    setSelectedReciter(reciterId);
+    audioPlayer.setReciter(reciterId);
+    setShowReciterSelection(false);
+  };
   
   useEffect(() => {
     if (audioPlayer.autoScroll && audioPlayer.currentAyah && scrollViewRef.current) {
@@ -96,9 +103,15 @@ export default function SurahScreen() {
           <Text style={styles.surahInfo}>
             {surah.englishName} • {surah.ayahs} verses • {surah.revelationType}
           </Text>
-          <Text style={styles.reciterInfo}>
-            Reciter: {currentReciter?.name || 'Sheikh Almatroud'}
-          </Text>
+          <TouchableOpacity 
+            style={styles.reciterSelector}
+            onPress={() => setShowReciterSelection(!showReciterSelection)}
+          >
+            <Text style={styles.reciterInfo}>
+              Reciter: {currentReciter?.name || 'Mishary Alafasy'}
+            </Text>
+            <Text style={styles.reciterChangeText}>Tap to change</Text>
+          </TouchableOpacity>
         </View>
       </LinearGradient>
       
@@ -144,6 +157,51 @@ export default function SurahScreen() {
             <Square size={16} color={Colors.error} fill={Colors.error} />
             <Text style={styles.stopButtonText}>Stop</Text>
           </TouchableOpacity>
+        </View>
+      )}
+      
+      {/* Reciter Selection Panel */}
+      {showReciterSelection && (
+        <View style={styles.reciterSelectionPanel}>
+          <Text style={styles.panelTitle}>Select Reciter</Text>
+          <ScrollView style={styles.reciterList} showsVerticalScrollIndicator={false}>
+            {TOP_RECITERS.slice(0, 10).map((reciter) => (
+              <TouchableOpacity
+                key={reciter.id}
+                style={[
+                  styles.reciterOption,
+                  selectedReciter === reciter.id && styles.reciterOptionSelected
+                ]}
+                onPress={() => handleReciterChange(reciter.id)}
+              >
+                <View style={styles.reciterOptionContent}>
+                  <Text style={[
+                    styles.reciterOptionName,
+                    selectedReciter === reciter.id && styles.reciterOptionNameSelected
+                  ]}>
+                    {reciter.name}
+                  </Text>
+                  <Text style={[
+                    styles.reciterOptionArabic,
+                    selectedReciter === reciter.id && styles.reciterOptionArabicSelected
+                  ]}>
+                    {reciter.arabicName}
+                  </Text>
+                  <Text style={[
+                    styles.reciterOptionCountry,
+                    selectedReciter === reciter.id && styles.reciterOptionCountrySelected
+                  ]}>
+                    {reciter.country} • {reciter.audioQuality}
+                  </Text>
+                </View>
+                {selectedReciter === reciter.id && (
+                  <View style={styles.selectedIndicator}>
+                    <Text style={styles.selectedIndicatorText}>✓</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
         </View>
       )}
       
@@ -695,5 +753,88 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: Colors.textLight,
     textAlign: 'center',
+  },
+  reciterSelector: {
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  reciterChangeText: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.7)',
+    marginTop: 2,
+  },
+  reciterSelectionPanel: {
+    backgroundColor: Colors.surface,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.surfaceVariant,
+    maxHeight: 300,
+  },
+  panelTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: Colors.text,
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  reciterList: {
+    maxHeight: 250,
+  },
+  reciterOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    marginBottom: 8,
+    backgroundColor: Colors.surfaceVariant,
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  reciterOptionSelected: {
+    backgroundColor: Colors.primaryOverlay,
+    borderColor: Colors.primary,
+  },
+  reciterOptionContent: {
+    flex: 1,
+  },
+  reciterOptionName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: Colors.text,
+    marginBottom: 2,
+  },
+  reciterOptionNameSelected: {
+    color: Colors.primary,
+  },
+  reciterOptionArabic: {
+    fontSize: 14,
+    color: Colors.textSecondary,
+    marginBottom: 2,
+    textAlign: 'right',
+  },
+  reciterOptionArabicSelected: {
+    color: Colors.primary,
+  },
+  reciterOptionCountry: {
+    fontSize: 12,
+    color: Colors.textLight,
+  },
+  reciterOptionCountrySelected: {
+    color: Colors.primary,
+  },
+  selectedIndicator: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: Colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  selectedIndicatorText: {
+    color: Colors.textOnPrimary,
+    fontSize: 14,
+    fontWeight: 'bold',
   },
 });

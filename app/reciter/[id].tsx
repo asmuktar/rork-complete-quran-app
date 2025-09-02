@@ -37,14 +37,15 @@ export default function ReciterDetailScreen() {
         setIsPlaying(true);
         // Set the reciter first
         audioPlayer.setReciter(reciterId);
+        console.log('Playing sample with reciter:', reciterId);
         // Play Al-Fatihah verse 1 as sample
         await audioPlayer.playAyah(1, 1);
         // Reset playing state when done
-        setTimeout(() => setIsPlaying(false), 3000);
+        setTimeout(() => setIsPlaying(false), 8000); // Increased timeout
       }
     } catch (error) {
       console.error('Error playing sample:', error);
-      Alert.alert('Error', 'Failed to play sample audio');
+      Alert.alert('Error', 'Failed to play sample audio. Please check your internet connection.');
       setIsPlaying(false);
     }
   };
@@ -153,23 +154,30 @@ export default function ReciterDetailScreen() {
           </View>
         </View>
 
-        {/* Popular Recitations */}
+        {/* Sample Ayahs */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Popular Recitations</Text>
-          {[
-            { name: 'Al-Fatihah', arabic: 'الفاتحة', duration: '1:23' },
-            { name: 'Al-Baqarah', arabic: 'البقرة', duration: '2:45:12' },
-            { name: 'Ali Imran', arabic: 'آل عمران', duration: '1:52:34' },
-            { name: 'An-Nisa', arabic: 'النساء', duration: '1:38:45' },
-            { name: 'Al-Maidah', arabic: 'المائدة', duration: '1:24:56' },
-          ].map((surah, index) => (
-            <TouchableOpacity key={index} style={styles.recitationItem}>
+          <Text style={styles.sectionTitle}>Sample Recitations</Text>
+          {reciter.sampleAyahs.map((sample, index) => (
+            <TouchableOpacity 
+              key={index} 
+              style={styles.recitationItem}
+              onPress={async () => {
+                try {
+                  audioPlayer.setReciter(reciterId);
+                  await audioPlayer.stopPlayback();
+                  await audioPlayer.playAyah(sample.surah, sample.ayah);
+                } catch (error) {
+                  console.error('Error playing sample ayah:', error);
+                  Alert.alert('Error', 'Failed to play sample ayah');
+                }
+              }}
+            >
               <View style={styles.recitationInfo}>
-                <Text style={styles.recitationName}>{surah.name}</Text>
-                <Text style={styles.recitationArabic}>{surah.arabic}</Text>
+                <Text style={styles.recitationName}>Surah {sample.surah}, Ayah {sample.ayah}</Text>
+                <Text style={styles.recitationArabic}>{sample.text}</Text>
+                <Text style={styles.sampleTranslation}>{sample.translation}</Text>
               </View>
               <View style={styles.recitationMeta}>
-                <Text style={styles.recitationDuration}>{surah.duration}</Text>
                 <TouchableOpacity style={styles.playButton}>
                   <Volume2 size={16} color={Colors.primary} />
                 </TouchableOpacity>
@@ -181,17 +189,13 @@ export default function ReciterDetailScreen() {
         {/* Biography */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Biography</Text>
-          <Text style={styles.biography}>
-            {reciter.name} is one of the most renowned Quranic reciters in the world. 
-            Born in {reciter.country}, he has dedicated his life to the beautiful recitation 
-            of the Holy Quran. His melodious voice and precise pronunciation have touched 
-            the hearts of millions of Muslims worldwide.
-            {"\n\n"}
-            He is known for his {reciter.specialties.join(', ')} and has been recognized 
-            for his exceptional {reciter.audioQuality.toLowerCase()} audio quality recordings. 
-            His recitations are widely used in mosques, Islamic centers, and by individual 
-            Muslims for their daily prayers and spiritual reflection.
-          </Text>
+          <Text style={styles.biography}>{reciter.biography}</Text>
+        </View>
+        
+        {/* Recitation Style */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Recitation Style</Text>
+          <Text style={styles.biography}>{reciter.recitationStyle}</Text>
         </View>
 
         {/* Footer */}
@@ -403,6 +407,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: Colors.textSecondary,
     lineHeight: 24,
+  },
+  sampleTranslation: {
+    fontSize: 12,
+    color: Colors.textLight,
+    marginTop: 4,
+    lineHeight: 16,
   },
   footer: {
     alignItems: 'center',

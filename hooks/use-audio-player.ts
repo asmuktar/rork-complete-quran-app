@@ -53,7 +53,7 @@ export function useAudioPlayer(): AudioPlayerState & AudioPlayerActions {
   const soundRef = useRef<Audio.Sound | null>(null);
   const webAudioRef = useRef<HTMLAudioElement | null>(null);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const currentReciterRef = useRef<string>('almatroud');
+  const currentReciterRef = useRef<string>('mishary-alafasy');
   const totalAyahsRef = useRef<number>(0);
 
   // Initialize audio mode for mobile
@@ -101,19 +101,46 @@ export function useAudioPlayer(): AudioPlayerState & AudioPlayerActions {
   }, [cleanup]);
 
   const getAudioUrl = useCallback((surahNumber: number, ayahNumber: number): string => {
-    // Use working audio URLs from EveryAyah.com
     const paddedSurah = surahNumber.toString().padStart(3, '0');
     const paddedAyah = ayahNumber.toString().padStart(3, '0');
     
-    // Use multiple fallback sources
-    const sources = [
-      `https://everyayah.com/data/Alafasy_128kbps/${paddedSurah}${paddedAyah}.mp3`,
-      `https://cdn.islamic.network/quran/audio/128/ar.alafasy/${paddedSurah}${paddedAyah}.mp3`,
-      `https://audio.qurancdn.com/${paddedSurah}${paddedAyah}.mp3`
-    ];
+    // Map reciter IDs to their audio directory names
+    const reciterAudioMap: Record<string, string> = {
+      'almatroud': 'Almatroud_128kbps',
+      'mishary-alafasy': 'Alafasy_128kbps',
+      'abdur-rahman-sudais': 'Abdurrahman_As-Sudais_192kbps',
+      'maher-al-muaiqly': 'Maher_AlMuaiqly_128kbps',
+      'abdullah-basfar': 'Abdullah_Basfar_192kbps',
+      'saad-al-ghamdi': 'Saad_Al-Ghamdi_128kbps',
+      'ali-al-hudhaify': 'Ali_Al-Hudhaify_128kbps',
+      'abu-bakr-al-shatri': 'Abu_Bakr_Al-Shatri_128kbps',
+      'ahmad-al-ajmi': 'Ahmad_Al-Ajmi_128kbps',
+      'mohamed-siddiq-al-minshawi': 'Minshawi_Mujawwad_128kbps',
+      'mohamed-al-tablawi': 'Tablawi_128kbps',
+      'aliyu-jabir': 'Aliyu_Jabir_128kbps',
+      'bandar-baleela': 'Bandar_Baleela_192kbps',
+      'yasser-al-dosari': 'Yasser_Al-Dosari_128kbps',
+      'khalid-al-jalil': 'Khalid_Al-Jalil_128kbps',
+      'nasser-al-qatami': 'Nasser_Al-Qatami_128kbps',
+      'fares-abbad': 'Fares_Abbad_128kbps',
+      'salah-al-budair': 'Salah_Al-Budair_128kbps',
+      'omar-al-kazabri': 'Omar_Al-Kazabri_128kbps',
+      'idris-abkar': 'Idris_Abkar_128kbps'
+    };
     
-    return sources[0]; // Start with the most reliable source
+    const reciterFolder = reciterAudioMap[currentReciterRef.current] || 'Alafasy_128kbps';
+    
+    // Primary source: EveryAyah.com (most reliable)
+    const primaryUrl = `https://everyayah.com/data/${reciterFolder}/${paddedSurah}${paddedAyah}.mp3`;
+    
+    console.log(`Getting audio URL for Surah ${surahNumber}, Ayah ${ayahNumber}, Reciter: ${currentReciterRef.current}`);
+    console.log('Audio URL:', primaryUrl);
+    
+    return primaryUrl;
   }, []);
+
+  // Forward declaration for playAudio function
+  let playAudioFunction: (url: string, shouldTriggerNext?: boolean) => Promise<void>;
 
   const handleAudioEnd = useCallback(() => {
     setState(currentState => {
@@ -134,7 +161,7 @@ export function useAudioPlayer(): AudioPlayerState & AudioPlayerActions {
           
           // Replay the same ayah
           const url = getAudioUrl(currentSurah, currentAyah);
-          playAudio(url, true);
+          playAudioFunction(url, true);
         }, 100);
         
         return { ...currentState, currentRepeat: currentState.currentRepeat + 1 };
@@ -170,7 +197,7 @@ export function useAudioPlayer(): AudioPlayerState & AudioPlayerActions {
 
         try {
           const url = getAudioUrl(currentSurah, nextAyah);
-          playAudio(url, true);
+          playAudioFunction(url, true);
         } catch (error) {
           console.error('Error playing next ayah:', error);
           setState(prev => ({ ...prev, isPlaying: false, error: 'Failed to play next ayah' }));
@@ -186,6 +213,7 @@ export function useAudioPlayer(): AudioPlayerState & AudioPlayerActions {
     await cleanup();
 
     setState(prev => ({ ...prev, isLoading: true, error: null }));
+    console.log('Playing audio from URL:', url);
 
     try {
       if (Platform.OS === 'web') {
@@ -193,19 +221,31 @@ export function useAudioPlayer(): AudioPlayerState & AudioPlayerActions {
           const audio = new (window as any).Audio(url) as HTMLAudioElement;
           webAudioRef.current = audio;
 
+          audio.onloadstart = () => {
+            console.log('Audio loading started');
+          };
+
           audio.onloadeddata = () => {
+            console.log('Audio data loaded');
             setState(prev => ({ ...prev, isLoading: false }));
           };
 
+          audio.oncanplay = () => {
+            console.log('Audio can start playing');
+          };
+
           audio.onplay = () => {
+            console.log('Audio started playing');
             setState(prev => ({ ...prev, isPlaying: true }));
           };
 
           audio.onpause = () => {
+            console.log('Audio paused');
             setState(prev => ({ ...prev, isPlaying: false }));
           };
 
           audio.onended = () => {
+            console.log('Audio ended');
             setState(prev => ({ ...prev, isPlaying: false }));
             if (shouldTriggerNext) {
               setTimeout(() => {
@@ -216,7 +256,7 @@ export function useAudioPlayer(): AudioPlayerState & AudioPlayerActions {
           };
 
           audio.onerror = (error: any) => {
-            console.error('Audio error:', error);
+            console.error('Audio error:', error, 'URL:', url);
             setState(prev => ({ 
               ...prev, 
               isLoading: false, 
@@ -226,20 +266,30 @@ export function useAudioPlayer(): AudioPlayerState & AudioPlayerActions {
             reject(error);
           };
 
-          // Set volume and play
+          // Set properties and play
           audio.volume = 1.0;
+          audio.preload = 'auto';
+          audio.crossOrigin = 'anonymous';
+          
           audio.play().catch((playError: any) => {
             console.error('Play error:', playError);
+            setState(prev => ({ 
+              ...prev, 
+              isLoading: false, 
+              isPlaying: false,
+              error: 'Failed to play audio' 
+            }));
             reject(playError);
           });
         });
       } else {
         const { sound } = await Audio.Sound.createAsync(
           { uri: url },
-          { shouldPlay: true, isLooping: false }
+          { shouldPlay: true, isLooping: false, volume: 1.0 }
         );
         
         soundRef.current = sound;
+        console.log('Mobile audio created and playing');
 
         // Wait for the sound to finish playing
         return new Promise((resolve) => {
@@ -252,6 +302,7 @@ export function useAudioPlayer(): AudioPlayerState & AudioPlayerActions {
               }));
 
               if (status.didJustFinish) {
+                console.log('Mobile audio finished');
                 setState(prev => ({ ...prev, isPlaying: false }));
                 if (shouldTriggerNext) {
                   setTimeout(() => {
@@ -261,6 +312,7 @@ export function useAudioPlayer(): AudioPlayerState & AudioPlayerActions {
                 resolve();
               }
             } else if (status.error) {
+              console.error('Mobile audio error:', status.error);
               setState(prev => ({ 
                 ...prev, 
                 isLoading: false, 
@@ -283,6 +335,9 @@ export function useAudioPlayer(): AudioPlayerState & AudioPlayerActions {
       throw error;
     }
   }, [cleanup, handleAudioEnd]);
+
+  // Assign the function to the forward declaration
+  playAudioFunction = playAudio;
 
   const playAyah = useCallback(async (surahNumber: number, ayahNumber: number) => {
     try {
@@ -317,7 +372,7 @@ export function useAudioPlayer(): AudioPlayerState & AudioPlayerActions {
         currentAyah: 1,
         playbackMode: 'continuous',
         currentRepeat: 0,
-        isPlaying: true
+        isPlaying: false
       }));
 
       // Start playing the first ayah and let the playback system handle the rest
@@ -432,6 +487,7 @@ export function useAudioPlayer(): AudioPlayerState & AudioPlayerActions {
   }, []);
 
   const setReciter = useCallback((reciterId: string) => {
+    console.log('Setting reciter to:', reciterId);
     currentReciterRef.current = reciterId;
   }, []);
 
