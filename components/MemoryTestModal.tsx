@@ -172,6 +172,7 @@ export default function MemoryTestModal({ visible, onClose }: MemoryTestModalPro
                     <Text style={styles.testModeDescription}>
                       Complete the ayah from a given beginning
                     </Text>
+                    <Text style={styles.testModeDifficulty}>★★★ Advanced</Text>
                   </LinearGradient>
                 </TouchableOpacity>
 
@@ -188,6 +189,7 @@ export default function MemoryTestModal({ visible, onClose }: MemoryTestModalPro
                     <Text style={styles.testModeDescription}>
                       Choose the correct translation of an ayah
                     </Text>
+                    <Text style={styles.testModeDifficulty}>★★☆ Intermediate</Text>
                   </LinearGradient>
                 </TouchableOpacity>
 
@@ -204,6 +206,7 @@ export default function MemoryTestModal({ visible, onClose }: MemoryTestModalPro
                     <Text style={styles.testModeDescription}>
                       Identify what comes after an ayah
                     </Text>
+                    <Text style={styles.testModeDifficulty}>★★☆ Intermediate</Text>
                   </LinearGradient>
                 </TouchableOpacity>
               </View>
@@ -277,6 +280,24 @@ export default function MemoryTestModal({ visible, onClose }: MemoryTestModalPro
                       <Text style={styles.resultTime}>
                         Time taken: {formatTime(timeElapsed)}
                       </Text>
+                      
+                      <View style={styles.performanceIndicator}>
+                        <Text style={styles.performanceLabel}>Performance:</Text>
+                        <View style={[
+                          styles.performanceBadge,
+                          { backgroundColor: isCorrect 
+                            ? (timeElapsed < 5 ? Colors.islamicGold : timeElapsed < 15 ? Colors.success : Colors.primary)
+                            : Colors.error
+                          }
+                        ]}>
+                          <Text style={styles.performanceBadgeText}>
+                            {isCorrect 
+                              ? (timeElapsed < 5 ? 'Mastered' : timeElapsed < 15 ? 'Strong' : 'Good')
+                              : 'Needs Review'
+                            }
+                          </Text>
+                        </View>
+                      </View>
                     </View>
                   </View>
 
@@ -454,6 +475,13 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.9)',
     textAlign: 'center',
     lineHeight: 20,
+    marginBottom: 8,
+  },
+  testModeDifficulty: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.8)',
+    textAlign: 'center',
+    fontWeight: '600',
   },
   noDataCard: {
     backgroundColor: Colors.errorOverlay,
@@ -632,5 +660,26 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     color: Colors.text,
+  },
+  performanceIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 12,
+  },
+  performanceLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.textSecondary,
+    marginRight: 8,
+  },
+  performanceBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  performanceBadgeText: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: Colors.textOnPrimary,
   },
 });

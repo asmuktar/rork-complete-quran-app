@@ -151,32 +151,45 @@ export const [HafizProvider, useHafiz] = createContextHook(() => {
     }
   };
 
-  const calculateNextReviewDate = (confidence: MemorizationProgress['confidence'], reviewCount: number): string => {
+  const calculateNextReviewDate = (confidence: MemorizationProgress['confidence'], reviewCount: number, difficulty: number = 2.5): string => {
+    // Enhanced spaced repetition using SM-2 algorithm principles
     const baseInterval = settings.spacedRepetitionInterval;
-    let multiplier = 1;
+    let interval = 1;
     
-    switch (confidence) {
-      case 'weak':
-        multiplier = 0.5;
-        break;
-      case 'medium':
-        multiplier = 1;
-        break;
-      case 'strong':
-        multiplier = 2;
-        break;
-      case 'mastered':
-        multiplier = 7;
-        break;
+    if (reviewCount === 1) {
+      interval = 1;
+    } else if (reviewCount === 2) {
+      interval = 6;
+    } else {
+      // Calculate interval based on previous interval and difficulty
+      const previousInterval = Math.max(1, baseInterval * Math.pow(difficulty, reviewCount - 2));
+      
+      switch (confidence) {
+        case 'weak':
+          interval = Math.max(1, Math.round(previousInterval * 0.6));
+          break;
+        case 'medium':
+          interval = Math.max(1, Math.round(previousInterval * 1.0));
+          break;
+        case 'strong':
+          interval = Math.max(1, Math.round(previousInterval * 1.3));
+          break;
+        case 'mastered':
+          interval = Math.max(1, Math.round(previousInterval * 2.5));
+          break;
+      }
     }
     
-    const interval = Math.max(1, baseInterval * multiplier * Math.pow(1.3, reviewCount));
+    // Add some randomization to prevent review clustering
+    const randomFactor = 0.9 + Math.random() * 0.2; // 0.9 to 1.1
+    interval = Math.round(interval * randomFactor);
+    
     const nextDate = new Date();
     nextDate.setDate(nextDate.getDate() + interval);
     return nextDate.toISOString();
   };
 
-  const updateProgress = async (surahId: number, ayahNumber: number, confidence: MemorizationProgress['confidence']) => {
+  const updateProgress = async (surahId: number, ayahNumber: number, confidence: MemorizationProgress['confidence'], responseTime?: number) => {
     const existingIndex = progress.findIndex(p => p.surahId === surahId && p.ayahNumber === ayahNumber);
     const now = new Date().toISOString();
     
@@ -184,24 +197,40 @@ export const [HafizProvider, useHafiz] = createContextHook(() => {
     
     if (existingIndex >= 0) {
       const existing = progress[existingIndex];
+      const isCorrect = confidence !== 'weak';
+      
+      // Update difficulty based on performance (SM-2 algorithm)
+      let newDifficulty = existing.difficulty;
+      if (isCorrect) {
+        newDifficulty = Math.max(1.3, existing.difficulty + (0.1 - (5 - (confidence === 'mastered' ? 5 : confidence === 'strong' ? 4 : 3)) * (0.08 + (5 - (confidence === 'mastered' ? 5 : confidence === 'strong' ? 4 : 3)) * 0.02)));
+      } else {
+        newDifficulty = Math.max(1.3, existing.difficulty - 0.8);
+      }
+      
       newProgress = {
         ...existing,
         confidence,
         lastReviewed: now,
         reviewCount: existing.reviewCount + 1,
-        nextReviewDate: calculateNextReviewDate(confidence, existing.reviewCount + 1),
+        correctAttempts: existing.correctAttempts + (isCorrect ? 1 : 0),
+        totalAttempts: existing.totalAttempts + 1,
+        difficulty: newDifficulty,
+        nextReviewDate: calculateNextReviewDate(confidence, existing.reviewCount + 1, newDifficulty),
       };
     } else {
+      const isCorrect = confidence !== 'weak';
+      const initialDifficulty = confidence === 'weak' ? 1.8 : confidence === 'medium' ? 2.2 : confidence === 'strong' ? 2.5 : 2.8;
+      
       newProgress = {
         surahId,
         ayahNumber,
         confidence,
         lastReviewed: now,
         reviewCount: 1,
-        correctAttempts: confidence === 'weak' ? 0 : 1,
+        correctAttempts: isCorrect ? 1 : 0,
         totalAttempts: 1,
-        nextReviewDate: calculateNextReviewDate(confidence, 1),
-        difficulty: confidence === 'weak' ? 4 : confidence === 'medium' ? 3 : confidence === 'strong' ? 2 : 1,
+        nextReviewDate: calculateNextReviewDate(confidence, 1, initialDifficulty),
+        difficulty: initialDifficulty,
         tags: [],
       };
     }
@@ -211,6 +240,9 @@ export const [HafizProvider, useHafiz] = createContextHook(() => {
       : [...progress, newProgress];
     
     await saveProgress(updatedProgress);
+    
+    // Update goals progress
+    await updateGoalsProgress(surahId, ayahNumber, confidence);
     
     if (isSessionActive) {
       setSessionAyahsStudied(prev => prev + 1);
@@ -242,13 +274,24 @@ export const [HafizProvider, useHafiz] = createContextHook(() => {
     if (!currentSession || !isSessionActive) return;
     
     const duration = Math.round((Date.now() - sessionStartTime) / 60000);
+    
+    // Calculate accuracy from recent test results during this session
+    const sessionStart = new Date(currentSession.date);
+    const sessionTests = testResults.filter(result => 
+      new Date(result.date) >= sessionStart
+    );
+    
+    const accuracy = sessionTests.length > 0 
+      ? Math.round(sessionTests.reduce((sum, test) => sum + test.score, 0) / sessionTests.length)
+      : 0;
+    
     const completedSession: StudySession = {
       ...currentSession,
-      duration,
+      duration: Math.max(1, duration), // Minimum 1 minute
       ayahsStudied: sessionAyahsStudied,
       ayahsReviewed: sessionAyahsReviewed,
       surahsStudied: Array.from(sessionSurahs),
-      accuracy: 85,
+      accuracy,
     };
     
     const updatedSessions = [completedSession, ...studySessions].slice(0, 100);
@@ -295,25 +338,60 @@ export const [HafizProvider, useHafiz] = createContextHook(() => {
     if (!ayah) return null;
     
     switch (mode) {
-      case 'recitation':
+      case 'recitation': {
+        // More sophisticated recitation testing
+        const words = ayah.text.split(' ');
+        const splitPoint = Math.floor(words.length * (0.3 + Math.random() * 0.4)); // 30-70% of the ayah
+        const questionPart = words.slice(0, splitPoint).join(' ');
+        const answerPart = words.slice(splitPoint).join(' ');
+        
         return {
-          question: `What comes after: "${ayah.text.substring(0, 20)}..."?`,
-          correctAnswer: ayah.text.substring(20),
+          question: `Complete this ayah: "${questionPart}..."`,
+          correctAnswer: answerPart,
           options: undefined,
         };
-      case 'meaning':
+      }
+      case 'meaning': {
+        // Generate better distractors for meaning tests
+        const otherAyahs = surah.verses.filter(v => v.number !== ayahNumber && v.translation);
+        const distractors = otherAyahs
+          .sort(() => Math.random() - 0.5)
+          .slice(0, 3)
+          .map(v => v.translation);
+        
+        const options = [ayah.translation, ...distractors].sort(() => Math.random() - 0.5);
+        
         return {
-          question: `What is the meaning of this ayah: "${ayah.text}"?`,
+          question: `What is the meaning of this ayah?\n\n"${ayah.text}"`,
           correctAnswer: ayah.translation,
-          options: [ayah.translation, 'Sample wrong answer 1', 'Sample wrong answer 2', 'Sample wrong answer 3'],
+          options,
         };
-      case 'sequence':
+      }
+      case 'sequence': {
         const nextAyah = surah.verses.find(v => v.number === ayahNumber + 1);
+        if (!nextAyah) {
+          // Test knowledge of surah ending
+          return {
+            question: `What comes after ayah ${ayahNumber} in ${surah.name}?`,
+            correctAnswer: 'End of Surah',
+            options: ['End of Surah', 'Continue to next Surah', 'Repeat from beginning', 'Go to verse 1'],
+          };
+        }
+        
+        // Generate distractors from other ayahs in the same surah
+        const otherAyahs = surah.verses
+          .filter(v => v.number !== nextAyah.number && Math.abs(v.number - ayahNumber) > 2)
+          .sort(() => Math.random() - 0.5)
+          .slice(0, 3);
+        
+        const options = [nextAyah.text, ...otherAyahs.map(v => v.text)].sort(() => Math.random() - 0.5);
+        
         return {
-          question: `What comes after ayah ${ayahNumber}?`,
-          correctAnswer: nextAyah?.text || 'End of Surah',
-          options: nextAyah ? [nextAyah.text, 'Sample wrong answer 1', 'Sample wrong answer 2', 'Sample wrong answer 3'] : undefined,
+          question: `What comes after ayah ${ayahNumber} in ${surah.name}?`,
+          correctAnswer: nextAyah.text,
+          options,
         };
+      }
       default:
         return null;
     }
@@ -323,13 +401,36 @@ export const [HafizProvider, useHafiz] = createContextHook(() => {
     let targetProgress: MemorizationProgress | undefined;
     
     if (surahId) {
-      const surahProgress = progress.filter(p => p.surahId === surahId && p.confidence !== 'mastered');
-      targetProgress = surahProgress[Math.floor(Math.random() * surahProgress.length)];
+      // Focus on specific surah, prioritize weaker ayahs
+      const surahProgress = progress
+        .filter(p => p.surahId === surahId)
+        .sort((a, b) => {
+          const confidenceOrder = { weak: 0, medium: 1, strong: 2, mastered: 3 };
+          const confDiff = confidenceOrder[a.confidence] - confidenceOrder[b.confidence];
+          if (confDiff !== 0) return confDiff;
+          return new Date(a.nextReviewDate).getTime() - new Date(b.nextReviewDate).getTime();
+        });
+      
+      targetProgress = surahProgress[0];
     } else {
-      const weakProgress = progress.filter(p => p.confidence === 'weak' || p.confidence === 'medium');
-      targetProgress = weakProgress[Math.floor(Math.random() * weakProgress.length)];
+      // Intelligent selection based on spaced repetition and difficulty
+      const dueForReview = getDueForReview();
+      const weakAyahs = progress.filter(p => p.confidence === 'weak');
+      const mediumAyahs = progress.filter(p => p.confidence === 'medium');
+      
+      // Prioritize: due for review > weak > medium > random
+      if (dueForReview.length > 0) {
+        targetProgress = dueForReview[Math.floor(Math.random() * Math.min(5, dueForReview.length))];
+      } else if (weakAyahs.length > 0) {
+        targetProgress = weakAyahs[Math.floor(Math.random() * weakAyahs.length)];
+      } else if (mediumAyahs.length > 0) {
+        targetProgress = mediumAyahs[Math.floor(Math.random() * mediumAyahs.length)];
+      } else if (progress.length > 0) {
+        targetProgress = progress[Math.floor(Math.random() * progress.length)];
+      }
     }
     
+    // Fallback to Al-Fatiha if no progress data
     if (!targetProgress) {
       targetProgress = { surahId: 1, ayahNumber: 1, confidence: 'medium' } as MemorizationProgress;
     }
@@ -354,6 +455,25 @@ export const [HafizProvider, useHafiz] = createContextHook(() => {
     const isCorrect = answer.trim().toLowerCase() === currentTest.correctAnswer.trim().toLowerCase();
     const timeSpent = Math.round((Date.now() - currentTest.startTime) / 1000);
     
+    // Calculate confidence based on correctness, time, and test type
+    let newConfidence: MemorizationProgress['confidence'];
+    if (isCorrect) {
+      if (timeSpent < 5) {
+        newConfidence = 'mastered';
+      } else if (timeSpent < 15) {
+        newConfidence = 'strong';
+      } else {
+        newConfidence = 'medium';
+      }
+    } else {
+      newConfidence = 'weak';
+    }
+    
+    // Adjust confidence based on test type difficulty
+    if (testMode === 'recitation' && newConfidence === 'medium') {
+      newConfidence = 'strong'; // Recitation is harder, so medium performance = strong
+    }
+    
     const testResult: TestResult = {
       id: Date.now().toString(),
       date: new Date().toISOString(),
@@ -369,11 +489,7 @@ export const [HafizProvider, useHafiz] = createContextHook(() => {
     const updatedResults = [testResult, ...testResults].slice(0, 500);
     await saveTestResults(updatedResults);
     
-    const newConfidence: MemorizationProgress['confidence'] = isCorrect 
-      ? (timeSpent < 10 ? 'strong' : 'medium')
-      : 'weak';
-    
-    await updateProgress(currentTest.surahId, currentTest.ayahNumber, newConfidence);
+    await updateProgress(currentTest.surahId, currentTest.ayahNumber, newConfidence, timeSpent);
     
     setCurrentTest({ ...currentTest, userAnswer: answer });
   };
@@ -455,6 +571,86 @@ export const [HafizProvider, useHafiz] = createContextHook(() => {
     };
   };
 
+  // Helper function to update goal progress
+  const updateGoalsProgress = async (surahId: number, ayahNumber: number, confidence: MemorizationProgress['confidence']) => {
+    const updatedGoals = goals.map(goal => {
+      if (goal.completed) return goal;
+      
+      const isRelevantToGoal = goal.surahIds.includes(surahId) && 
+        (!goal.ayahRange || (ayahNumber >= goal.ayahRange.start && ayahNumber <= goal.ayahRange.end));
+      
+      if (!isRelevantToGoal) return goal;
+      
+      // Calculate progress based on mastered ayahs in goal scope
+      const relevantProgress = progress.filter(p => 
+        goal.surahIds.includes(p.surahId) &&
+        (!goal.ayahRange || (p.ayahNumber >= goal.ayahRange.start && p.ayahNumber <= goal.ayahRange.end)) &&
+        (p.confidence === 'strong' || p.confidence === 'mastered')
+      );
+      
+      // Add current ayah if it's strong or mastered
+      if ((confidence === 'strong' || confidence === 'mastered') && isRelevantToGoal) {
+        const existingProgress = relevantProgress.find(p => p.surahId === surahId && p.ayahNumber === ayahNumber);
+        if (!existingProgress) {
+          relevantProgress.push({ surahId, ayahNumber, confidence } as MemorizationProgress);
+        }
+      }
+      
+      // Calculate total ayahs in goal scope
+      let totalAyahs = 0;
+      for (const goalSurahId of goal.surahIds) {
+        const surah = getSurahById(goalSurahId);
+        if (surah) {
+          if (goal.ayahRange) {
+            totalAyahs += Math.min(goal.ayahRange.end, surah.verses.length) - goal.ayahRange.start + 1;
+          } else {
+            totalAyahs += surah.verses.length;
+          }
+        }
+      }
+      
+      const newProgress = totalAyahs > 0 ? Math.round((relevantProgress.length / totalAyahs) * 100) : 0;
+      const isCompleted = newProgress >= 100;
+      
+      return {
+        ...goal,
+        progress: newProgress,
+        completed: isCompleted,
+      };
+    });
+    
+    await saveGoals(updatedGoals);
+  };
+  
+  const getDetailedStats = () => {
+    const totalAyahs = progress.length;
+    const masteredAyahs = progress.filter(p => p.confidence === 'mastered').length;
+    const strongAyahs = progress.filter(p => p.confidence === 'strong').length;
+    const averageAccuracy = progress.length > 0 
+      ? Math.round(progress.reduce((sum, p) => sum + (p.correctAttempts / p.totalAttempts * 100), 0) / progress.length)
+      : 0;
+    
+    const last7Days = studySessions.filter(session => {
+      const sessionDate = new Date(session.date);
+      const weekAgo = new Date();
+      weekAgo.setDate(weekAgo.getDate() - 7);
+      return sessionDate >= weekAgo;
+    });
+    
+    const weeklyStudyTime = last7Days.reduce((total, session) => total + session.duration, 0);
+    const weeklyAyahs = last7Days.reduce((total, session) => total + session.ayahsStudied, 0);
+    
+    return {
+      totalAyahs,
+      masteredAyahs,
+      strongAyahs,
+      averageAccuracy,
+      weeklyStudyTime,
+      weeklyAyahs,
+      completionRate: totalAyahs > 0 ? Math.round(((masteredAyahs + strongAyahs) / totalAyahs) * 100) : 0,
+    };
+  };
+
   return {
     progress,
     studySessions,
@@ -482,5 +678,7 @@ export const [HafizProvider, useHafiz] = createContextHook(() => {
     getWeakAyahs,
     getStudyStreak,
     getTodayStats,
+    getDetailedStats,
+    updateGoalsProgress,
   };
 });

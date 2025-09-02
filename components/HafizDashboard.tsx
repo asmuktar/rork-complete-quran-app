@@ -33,15 +33,19 @@ export default function HafizDashboard({
     getStudyStreak, 
     getTodayStats, 
     getWeakAyahs,
+    getDetailedStats,
     isSessionActive,
     currentSession,
-    goals
+    goals,
+    testResults
   } = useHafiz();
 
   const todayStats = getTodayStats();
+  const detailedStats = getDetailedStats();
   const studyStreak = getStudyStreak();
   const weakAyahs = getWeakAyahs();
   const activeGoals = goals.filter(g => !g.completed);
+  const recentTests = testResults.slice(0, 5);
 
   const confidenceStats = {
     weak: progress.filter(p => p.confidence === 'weak').length,
@@ -80,12 +84,33 @@ export default function HafizDashboard({
         
         <View style={styles.statCard}>
           <View style={styles.statIcon}>
-            <Award size={20} color={Colors.error} />
+            <Award size={20} color={Colors.islamicGold} />
           </View>
-          <Text style={styles.statValue}>{confidenceStats.mastered}</Text>
-          <Text style={styles.statLabel}>Mastered</Text>
+          <Text style={styles.statValue}>{detailedStats.completionRate}%</Text>
+          <Text style={styles.statLabel}>Completion</Text>
         </View>
       </View>
+      
+      {/* Weekly Progress Summary */}
+      {detailedStats.weeklyStudyTime > 0 && (
+        <View style={styles.weeklyProgressCard}>
+          <Text style={styles.weeklyProgressTitle}>This Week&apos;s Progress</Text>
+          <View style={styles.weeklyProgressStats}>
+            <View style={styles.weeklyProgressItem}>
+              <Text style={styles.weeklyProgressValue}>{detailedStats.weeklyStudyTime}m</Text>
+              <Text style={styles.weeklyProgressLabel}>Study Time</Text>
+            </View>
+            <View style={styles.weeklyProgressItem}>
+              <Text style={styles.weeklyProgressValue}>{detailedStats.weeklyAyahs}</Text>
+              <Text style={styles.weeklyProgressLabel}>Ayahs Studied</Text>
+            </View>
+            <View style={styles.weeklyProgressItem}>
+              <Text style={styles.weeklyProgressValue}>{detailedStats.averageAccuracy}%</Text>
+              <Text style={styles.weeklyProgressLabel}>Accuracy</Text>
+            </View>
+          </View>
+        </View>
+      )}
 
       {/* Current Session */}
       {isSessionActive && currentSession && (
@@ -243,6 +268,31 @@ export default function HafizDashboard({
         )}
       </View>
 
+      {/* Recent Test Results */}
+      {recentTests.length > 0 && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Recent Test Results</Text>
+          <View style={styles.testResultsList}>
+            {recentTests.map((test) => (
+              <View key={test.id} style={styles.testResultCard}>
+                <View style={styles.testResultHeader}>
+                  <Text style={styles.testResultType}>{test.testType.toUpperCase()}</Text>
+                  <View style={[
+                    styles.testResultScore,
+                    { backgroundColor: test.score === 100 ? Colors.success : Colors.error }
+                  ]}>
+                    <Text style={styles.testResultScoreText}>{test.score}%</Text>
+                  </View>
+                </View>
+                <Text style={styles.testResultTime}>
+                  {Math.floor(test.timeSpent / 60)}:{(test.timeSpent % 60).toString().padStart(2, '0')}
+                </Text>
+              </View>
+            ))}
+          </View>
+        </View>
+      )}
+      
       {/* Weak Ayahs Alert */}
       {weakAyahs.length > 0 && (
         <View style={styles.alertCard}>
@@ -558,5 +608,77 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: Colors.textOnPrimary,
+  },
+  weeklyProgressCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 20,
+    elevation: 2,
+    shadowColor: Colors.text,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+  weeklyProgressTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: Colors.text,
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  weeklyProgressStats: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+  },
+  weeklyProgressItem: {
+    alignItems: 'center',
+  },
+  weeklyProgressValue: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: Colors.primary,
+    marginBottom: 4,
+  },
+  weeklyProgressLabel: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+  },
+  testResultsList: {
+    gap: 8,
+  },
+  testResultCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: 8,
+    padding: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  testResultHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  testResultType: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: Colors.textSecondary,
+    marginRight: 12,
+  },
+  testResultScore: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  testResultScoreText: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    color: Colors.textOnPrimary,
+  },
+  testResultTime: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+    fontFamily: 'monospace',
   },
 });
