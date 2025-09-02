@@ -5,124 +5,14 @@ import { Search, BookOpen, ExternalLink, Shield } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors } from '@/constants/colors';
-
-interface HadithCollection {
-  id: string;
-  name: string;
-  arabicName: string;
-  compiler: string;
-  totalHadiths: number;
-  description: string;
-  authenticity: 'Sahih' | 'Hasan' | 'Mixed';
-}
-
-const hadithCollections: HadithCollection[] = [
-  {
-    id: 'bukhari',
-    name: 'Sahih al-Bukhari',
-    arabicName: 'صحيح البخاري',
-    compiler: 'Imam al-Bukhari',
-    totalHadiths: 7563,
-    description: 'The most authentic collection of Hadith',
-    authenticity: 'Sahih'
-  },
-  {
-    id: 'muslim',
-    name: 'Sahih Muslim',
-    arabicName: 'صحيح مسلم',
-    compiler: 'Imam Muslim',
-    totalHadiths: 7190,
-    description: 'Second most authentic collection after Bukhari',
-    authenticity: 'Sahih'
-  },
-  {
-    id: 'abudawud',
-    name: 'Sunan Abu Dawud',
-    arabicName: 'سنن أبي داود',
-    compiler: 'Abu Dawud',
-    totalHadiths: 5274,
-    description: 'Focus on legal and practical matters',
-    authenticity: 'Mixed'
-  },
-  {
-    id: 'tirmidhi',
-    name: 'Jami at-Tirmidhi',
-    arabicName: 'جامع الترمذي',
-    compiler: 'At-Tirmidhi',
-    totalHadiths: 3956,
-    description: 'Known for grading authenticity of hadiths',
-    authenticity: 'Mixed'
-  },
-  {
-    id: 'nasai',
-    name: 'Sunan an-Nasa\'i',
-    arabicName: 'سنن النسائي',
-    compiler: 'An-Nasa\'i',
-    totalHadiths: 5761,
-    description: 'Strict criteria for hadith acceptance',
-    authenticity: 'Mixed'
-  },
-  {
-    id: 'ibnmajah',
-    name: 'Sunan Ibn Majah',
-    arabicName: 'سنن ابن ماجه',
-    compiler: 'Ibn Majah',
-    totalHadiths: 4341,
-    description: 'Completes the six major collections',
-    authenticity: 'Mixed'
-  },
-  {
-    id: 'malik',
-    name: 'Muwatta Malik',
-    arabicName: 'موطأ مالك',
-    compiler: 'Imam Malik',
-    totalHadiths: 1720,
-    description: 'Earliest surviving collection',
-    authenticity: 'Sahih'
-  },
-  {
-    id: 'ahmad',
-    name: 'Musnad Ahmad',
-    arabicName: 'مسند أحمد',
-    compiler: 'Ahmad ibn Hanbal',
-    totalHadiths: 26363,
-    description: 'Largest collection of hadiths',
-    authenticity: 'Mixed'
-  }
-];
-
-const recentHadiths = [
-  {
-    id: 1,
-    collection: 'Sahih al-Bukhari',
-    number: 1,
-    text: 'Actions are but by intention and every man shall have but that which he intended.',
-    arabicText: 'إِنَّمَا الْأَعْمَالُ بِالنِّيَّاتِ وَإِنَّمَا لِكُلِّ امْرِئٍ مَا نَوَى',
-    narrator: 'Umar ibn al-Khattab'
-  },
-  {
-    id: 2,
-    collection: 'Sahih Muslim',
-    number: 2564,
-    text: 'The believer is not one who eats his fill while his neighbor goes hungry.',
-    arabicText: 'لَيْسَ الْمُؤْمِنُ الَّذِي يَشْبَعُ وَجَارُهُ جَائِعٌ إِلَى جَنْبِهِ',
-    narrator: 'Anas ibn Malik'
-  },
-  {
-    id: 3,
-    collection: 'Jami at-Tirmidhi',
-    number: 1987,
-    text: 'The best of people are those who benefit others.',
-    arabicText: 'خَيْرُ النَّاسِ أَنْفَعُهُمْ لِلنَّاسِ',
-    narrator: 'Jabir ibn Abdullah'
-  }
-];
+import { HADITH_COLLECTIONS, FEATURED_HADITHS } from '@/constants/hadith-data';
+import type { HadithCollection } from '@/constants/hadith-data';
 
 export default function HadithScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFilter, setSelectedFilter] = useState<'all' | 'sahih' | 'mixed'>('all');
 
-  const filteredCollections = hadithCollections.filter(collection => {
+  const filteredCollections = HADITH_COLLECTIONS.filter(collection => {
     const matchesSearch = collection.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          collection.compiler.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          collection.arabicName.includes(searchQuery);
@@ -200,10 +90,10 @@ export default function HadithScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Recent Hadiths */}
+        {/* Featured Hadiths */}
         <View style={styles.sectionContainer}>
           <Text style={styles.sectionTitle}>Hadith of the Day</Text>
-          {recentHadiths.slice(0, 1).map((hadith) => (
+          {FEATURED_HADITHS.slice(0, 1).map((hadith) => (
             <View key={hadith.id} style={styles.hadithCard}>
               <Text style={styles.hadithArabic}>{hadith.arabicText}</Text>
               <Text style={styles.hadithText}>{hadith.text}</Text>
@@ -243,6 +133,10 @@ export default function HadithScreen() {
                 
                 <View style={styles.collectionMeta}>
                   <Text style={styles.collectionCount}>{collection.totalHadiths.toLocaleString()} Hadiths</Text>
+                <View style={styles.availabilityIndicator}>
+                  <View style={[styles.statusDot, { backgroundColor: collection.available ? Colors.success : Colors.warning }]} />
+                  <Text style={styles.statusText}>{collection.available ? 'Available' : 'Coming Soon'}</Text>
+                </View>
                 </View>
               </View>
               
@@ -482,6 +376,22 @@ const styles = StyleSheet.create({
   },
   collectionCount: {
     fontSize: 12,
+    color: Colors.textLight,
+    fontWeight: '500',
+    flex: 1,
+  },
+  availabilityIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  statusText: {
+    fontSize: 10,
     color: Colors.textLight,
     fontWeight: '500',
   },
