@@ -2,11 +2,13 @@ import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, TextInput, ScrollView, TouchableOpacity, Platform, Alert, Dimensions, Animated } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Search, Mic, MicOff, Volume2, BookOpen, User, Loader, Play, Pause } from 'lucide-react-native';
+import { Search, Mic, MicOff, Volume2, BookOpen, User, Loader, Play, Pause, StopCircle, SkipForward } from 'lucide-react-native';
 import { Colors } from '@/constants/colors';
 import { Audio } from 'expo-av';
 import { trpc } from '@/lib/trpc';
 import { SURAHS, searchSurahs } from '@/constants/quran-data';
+import { TOP_RECITERS, getReciterById } from '@/constants/reciters';
+import { useAudioPlayer } from '@/hooks/use-audio-player';
 
 const { width } = Dimensions.get('window');
 
@@ -21,6 +23,12 @@ interface SearchResult {
   surahNumber?: number;
   ayahNumber?: number;
   reciterName?: string;
+  reciterId?: string;
+  audioUrl?: string;
+  relevanceScore?: number;
+  matchType?: 'exact' | 'partial' | 'phonetic' | 'semantic';
+  surahName?: string;
+  verseKey?: string;
 }
 
 export default function SearchScreen() {
@@ -31,19 +39,24 @@ export default function SearchScreen() {
   const [hasSearched, setHasSearched] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [selectedReciter, setSelectedReciter] = useState('mishary-alafasy');
+  
+  const { 
+    isPlaying, 
+    isLoading: audioLoading,
+    currentAyah,
+    currentSurah,
+    playAyah,
+    stopPlayback,
+    pausePlayback,
+    resumePlayback,
+    setReciter
+  } = useAudioPlayer();
   
   const searchMutation = trpc.quran.searchVerses.useMutation({
     onSuccess: (data) => {
-      const results: SearchResult[] = data.map((result: any) => ({
-        id: `ayah-${result.verse_key}`,
-        type: 'ayah' as const,
-        title: `${result.verse_key}`,
-        arabicText: result.text_uthmani,
-        translation: result.translations?.[0]?.text || '',
-        surahNumber: parseInt(result.verse_key.split(':')[0]),
-        ayahNumber: parseInt(result.verse_key.split(':')[1]),
-      }));
-      setSearchResults(results);
+      const enhancedResults = enhanceSearchResults(data, searchQuery);
+      setSearchResults(enhancedResults);
       setIsLoading(false);
     },
     onError: (error) => {
@@ -55,16 +68,8 @@ export default function SearchScreen() {
   
   const voiceSearchMutation = trpc.quran.voiceSearch.useMutation({
     onSuccess: (data) => {
-      const results: SearchResult[] = data.map((result: any) => ({
-        id: `ayah-${result.verse_key}`,
-        type: 'ayah' as const,
-        title: `${result.verse_key}`,
-        arabicText: result.text_uthmani,
-        translation: result.translations?.[0]?.text || '',
-        surahNumber: parseInt(result.verse_key.split(':')[0]),
-        ayahNumber: parseInt(result.verse_key.split(':')[1]),
-      }));
-      setSearchResults(results);
+      const enhancedResults = enhanceSearchResults(data, searchQuery);
+      setSearchResults(enhancedResults);
       setIsProcessing(false);
       setHasSearched(true);
     },
@@ -79,6 +84,130 @@ export default function SearchScreen() {
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Enhanced search algorithm similar to Shazam
+  const enhanceSearchResults = useCallback((data: any[], query: string): SearchResult[] => {
+    const results: SearchResult[] = data.map((result: any) => {
+      const surahNumber = parseInt(result.verse_key.split(':')[0]);
+      const ayahNumber = parseInt(result.verse_key.split(':')[1]);
+      const surahInfo = SURAHS.find(s => s.id === surahNumber);
+      const reciter = getReciterById(selectedReciter);
+      
+      // Calculate relevance score using multiple factors
+      const relevanceScore = calculateRelevanceScore(result, query);
+      const matchType = determineMatchType(result, query);
+      
+      // Generate audio URL for the specific ayah
+      const audioUrl = getAyahAudioUrl(surahNumber, ayahNumber, selectedReciter);
+      
+      return {
+        id: `ayah-${result.verse_key}`,
+        type: 'ayah' as const,
+        title: `Surah ${surahInfo?.englishName || surahNumber} - Ayah ${ayahNumber}`,
+        subtitle: `${result.verse_key} • ${reciter?.name || 'Unknown Reciter'}`,
+        arabicText: result.text_uthmani,
+        translation: result.translations?.[0]?.text || '',
+        surahNumber,
+        ayahNumber,
+        surahName: surahInfo?.englishName,
+        reciterName: reciter?.name,
+        reciterId: selectedReciter,
+        audioUrl,
+        relevanceScore,
+        matchType,
+        verseKey: result.verse_key,
+      };
+    });
+    
+    // Sort by relevance score (Shazam-like ranking)
+    return results.sort((a, b) => (b.relevanceScore || 0) - (a.relevanceScore || 0));
+  }, [selectedReciter]);
+  
+  // Calculate relevance score based on multiple factors
+  const calculateRelevanceScore = (result: any, query: string): number => {
+    let score = 0;
+    const queryLower = query.toLowerCase();
+    const arabicText = result.text_uthmani || '';
+    const translation = result.translations?.[0]?.text?.toLowerCase() || '';
+    
+    // Exact match in translation (highest score)
+    if (translation.includes(queryLower)) {
+      score += 100;
+      if (translation.startsWith(queryLower)) score += 50;
+    }
+    
+    // Partial word matches
+    const queryWords = queryLower.split(' ');
+    const translationWords = translation.split(' ');
+    
+    queryWords.forEach(queryWord => {
+      translationWords.forEach((transWord: string) => {
+        if (transWord.includes(queryWord)) {
+          score += 20;
+        }
+        if (transWord === queryWord) {
+          score += 40;
+        }
+      });
+    });
+    
+    // Arabic text matching (for Arabic queries)
+    if (arabicText.includes(query)) {
+      score += 150;
+    }
+    
+    // Boost popular verses
+    const verseKey = result.verse_key;
+    const popularVerses = ['1:1', '2:255', '112:1', '113:1', '114:1', '36:1', '67:1'];
+    if (popularVerses.includes(verseKey)) {
+      score += 30;
+    }
+    
+    return score;
+  };
+  
+  // Determine match type for better UX
+  const determineMatchType = (result: any, query: string): 'exact' | 'partial' | 'phonetic' | 'semantic' => {
+    const translation = result.translations?.[0]?.text?.toLowerCase() || '';
+    const queryLower = query.toLowerCase();
+    
+    if (translation.includes(queryLower)) {
+      return translation.indexOf(queryLower) === 0 ? 'exact' : 'partial';
+    }
+    
+    if (result.text_uthmani?.includes(query)) {
+      return 'exact';
+    }
+    
+    // Check for semantic similarity (simplified)
+    const semanticKeywords = {
+      'god': ['allah', 'lord', 'creator'],
+      'prayer': ['salah', 'worship', 'pray'],
+      'mercy': ['merciful', 'compassion', 'forgiveness'],
+      'paradise': ['heaven', 'jannah', 'garden'],
+      'hell': ['fire', 'punishment', 'jahannam']
+    };
+    
+    for (const [key, synonyms] of Object.entries(semanticKeywords)) {
+      if (queryLower.includes(key) && synonyms.some(syn => translation.includes(syn))) {
+        return 'semantic';
+      }
+    }
+    
+    return 'phonetic';
+  };
+  
+  // Generate audio URL for specific ayah
+  const getAyahAudioUrl = (surahNumber: number, ayahNumber: number, reciterId: string): string => {
+    const reciter = getReciterById(reciterId);
+    if (!reciter) return '';
+    
+    const paddedSurah = surahNumber.toString().padStart(3, '0');
+    const paddedAyah = ayahNumber.toString().padStart(3, '0');
+    
+    // Use the reciter's audio URL pattern
+    return `${reciter.audioUrl}${paddedSurah}${paddedAyah}.mp3`;
+  };
   
   // Auto-stop recording after 10 seconds
   const RECORDING_DURATION = 10000;
@@ -287,6 +416,37 @@ export default function SearchScreen() {
     setSearchQuery(text);
     performSearch(text);
   }, [performSearch]);
+  
+  // Audio playback functions
+  const handlePlayAyah = useCallback(async (result: SearchResult) => {
+    if (!result.surahNumber || !result.ayahNumber) return;
+    
+    try {
+      // Set the reciter first
+      setReciter(selectedReciter);
+      
+      const isCurrentAyah = currentSurah === result.surahNumber && currentAyah === result.ayahNumber;
+      
+      if (isCurrentAyah && isPlaying) {
+        await pausePlayback();
+      } else if (isCurrentAyah && !isPlaying) {
+        await resumePlayback();
+      } else {
+        await playAyah(result.surahNumber, result.ayahNumber);
+      }
+    } catch (error) {
+      console.error('Error playing audio:', error);
+      Alert.alert('Playback Error', 'Failed to play audio. Please try again.');
+    }
+  }, [currentSurah, currentAyah, isPlaying, playAyah, pausePlayback, resumePlayback, setReciter, selectedReciter]);
+  
+  const handleStopAudio = useCallback(async () => {
+    try {
+      await stopPlayback();
+    } catch (error) {
+      console.error('Error stopping audio:', error);
+    }
+  }, [stopPlayback]);
 
   const renderSearchResult = (result: SearchResult) => {
     const getIcon = () => {
@@ -303,39 +463,96 @@ export default function SearchScreen() {
     };
 
     const getTypeLabel = () => {
-      switch (result.type) {
-        case 'ayah':
-          return 'Ayah';
-        case 'surah':
-          return 'Surah';
-        case 'reciter':
-          return 'Reciter';
-        default:
-          return '';
+      const baseLabel = result.type === 'ayah' ? 'Ayah' : result.type === 'surah' ? 'Surah' : 'Reciter';
+      if (result.matchType) {
+        const matchLabels = {
+          exact: '🎯 Exact',
+          partial: '📝 Partial',
+          phonetic: '🔊 Phonetic',
+          semantic: '🧠 Semantic'
+        };
+        return `${baseLabel} • ${matchLabels[result.matchType]}`;
       }
+      return baseLabel;
     };
+    
+    const getRelevanceColor = () => {
+      if (!result.relevanceScore) return Colors.textLight;
+      if (result.relevanceScore > 100) return Colors.success;
+      if (result.relevanceScore > 50) return Colors.warning;
+      return Colors.textLight;
+    };
+    
+    const isCurrentlyPlaying = currentSurah === result.surahNumber && currentAyah === result.ayahNumber && isPlaying;
+    const isCurrentTrack = currentSurah === result.surahNumber && currentAyah === result.ayahNumber;
 
     return (
-      <TouchableOpacity key={result.id} style={styles.resultCard}>
+      <TouchableOpacity key={result.id} style={[
+        styles.resultCard,
+        isCurrentTrack && styles.resultCardActive
+      ]}>
         <View style={styles.resultHeader}>
           <View style={styles.resultIcon}>
             {getIcon()}
           </View>
           <View style={styles.resultContent}>
             <View style={styles.resultTitleRow}>
-              <Text style={styles.resultTitle}>{result.title}</Text>
-              <View style={styles.typeLabel}>
-                <Text style={styles.typeLabelText}>{getTypeLabel()}</Text>
+              <Text style={styles.resultTitle} numberOfLines={1}>{result.title}</Text>
+              <View style={[styles.typeLabel, { borderColor: getRelevanceColor() }]}>
+                <Text style={[styles.typeLabelText, { color: getRelevanceColor() }]}>
+                  {getTypeLabel()}
+                </Text>
               </View>
             </View>
             {result.subtitle && (
-              <Text style={styles.resultSubtitle}>{result.subtitle}</Text>
+              <Text style={styles.resultSubtitle} numberOfLines={1}>{result.subtitle}</Text>
             )}
-            {result.description && (
-              <Text style={styles.resultDescription}>{result.description}</Text>
+            {result.relevanceScore && result.relevanceScore > 0 && (
+              <Text style={[styles.relevanceScore, { color: getRelevanceColor() }]}>
+                Relevance: {Math.round(result.relevanceScore)}%
+              </Text>
+            )}
+          </View>
+          
+          {/* Audio Controls */}
+          <View style={styles.audioControls}>
+            {result.audioUrl && (
+              <TouchableOpacity
+                style={[
+                  styles.playButton,
+                  isCurrentlyPlaying && styles.playButtonActive
+                ]}
+                onPress={() => handlePlayAyah(result)}
+                disabled={audioLoading}
+              >
+                {audioLoading && isCurrentTrack ? (
+                  <Loader size={16} color={Colors.textOnPrimary} />
+                ) : isCurrentlyPlaying ? (
+                  <Pause size={16} color={Colors.textOnPrimary} />
+                ) : (
+                  <Play size={16} color={Colors.textOnPrimary} />
+                )}
+              </TouchableOpacity>
+            )}
+            
+            {isCurrentTrack && isPlaying && (
+              <TouchableOpacity
+                style={styles.stopButton}
+                onPress={handleStopAudio}
+              >
+                <StopCircle size={16} color={Colors.error} />
+              </TouchableOpacity>
             )}
           </View>
         </View>
+        
+        {/* Currently Playing Indicator */}
+        {isCurrentTrack && (
+          <View style={styles.playingIndicator}>
+            <View style={styles.playingDot} />
+            <Text style={styles.playingText}>Now Playing</Text>
+          </View>
+        )}
         
         {result.arabicText && (
           <View style={styles.arabicContainer}>
@@ -348,6 +565,11 @@ export default function SearchScreen() {
       </TouchableOpacity>
     );
   };
+  
+  // Update reciter when selection changes
+  useEffect(() => {
+    setReciter(selectedReciter);
+  }, [selectedReciter, setReciter]);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -397,6 +619,32 @@ export default function SearchScreen() {
               )}
             </TouchableOpacity>
           </View>
+          
+          {/* Reciter Selection */}
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false}
+            style={styles.reciterSelector}
+            contentContainerStyle={styles.reciterSelectorContent}
+          >
+            {TOP_RECITERS.slice(0, 8).map((reciter) => (
+              <TouchableOpacity
+                key={reciter.id}
+                style={[
+                  styles.reciterChip,
+                  selectedReciter === reciter.id && styles.reciterChipActive
+                ]}
+                onPress={() => setSelectedReciter(reciter.id)}
+              >
+                <Text style={[
+                  styles.reciterChipText,
+                  selectedReciter === reciter.id && styles.reciterChipTextActive
+                ]}>
+                  {reciter.name.split(' ')[0]}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
           
           {isRecording && (
             <View style={styles.recordingIndicator}>
@@ -459,9 +707,14 @@ export default function SearchScreen() {
 
         {!isLoading && !isProcessing && searchResults.length > 0 && (
           <View style={styles.resultsContainer}>
-            <Text style={styles.resultsHeader}>
-              {searchResults.length} result{searchResults.length !== 1 ? 's' : ''} found
-            </Text>
+            <View style={styles.resultsHeaderRow}>
+              <Text style={styles.resultsHeader}>
+                {searchResults.length} result{searchResults.length !== 1 ? 's' : ''} found
+              </Text>
+              <Text style={styles.resultsSubheader}>
+                Reciter: {getReciterById(selectedReciter)?.name || 'Unknown'}
+              </Text>
+            </View>
             {searchResults.map(renderSearchResult)}
           </View>
         )}
@@ -744,5 +997,99 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     lineHeight: 24,
     fontStyle: 'italic',
+  },
+  // New styles for enhanced search
+  resultCardActive: {
+    borderLeftColor: Colors.primary,
+    backgroundColor: Colors.primaryOverlay,
+  },
+  relevanceScore: {
+    fontSize: 12,
+    fontWeight: '500',
+    marginTop: 2,
+  },
+  audioControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  playButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: Colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 2,
+    shadowColor: Colors.text,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+  },
+  playButtonActive: {
+    backgroundColor: Colors.secondary,
+  },
+  stopButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  playingIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+    gap: 6,
+    marginTop: 8,
+  },
+  playingDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: Colors.success,
+  },
+  playingText: {
+    fontSize: 12,
+    color: Colors.success,
+    fontWeight: '500',
+  },
+  reciterSelector: {
+    marginTop: 8,
+  },
+  reciterSelectorContent: {
+    paddingHorizontal: 4,
+    gap: 8,
+  },
+  reciterChip: {
+    backgroundColor: Colors.surfaceVariant,
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: Colors.surfaceVariant,
+  },
+  reciterChipActive: {
+    backgroundColor: Colors.primaryOverlay,
+    borderColor: Colors.primary,
+  },
+  reciterChipText: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+    fontWeight: '500',
+  },
+  reciterChipTextActive: {
+    color: Colors.primary,
+    fontWeight: '600',
+  },
+  resultsHeaderRow: {
+    marginBottom: 16,
+  },
+  resultsSubheader: {
+    fontSize: 14,
+    color: Colors.textLight,
+    marginTop: 4,
   },
 });
