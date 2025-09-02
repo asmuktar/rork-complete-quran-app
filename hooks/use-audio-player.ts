@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { Platform } from 'react-native';
 import { Audio } from 'expo-av';
+import audioDownloadService from '@/services/audio-download-service';
 
 export interface AudioPlayerState {
   isPlaying: boolean;
@@ -100,43 +101,28 @@ export function useAudioPlayer(): AudioPlayerState & AudioPlayerActions {
     };
   }, [cleanup]);
 
-  const getAudioUrl = useCallback((surahNumber: number, ayahNumber: number): string => {
-    const paddedSurah = surahNumber.toString().padStart(3, '0');
-    const paddedAyah = ayahNumber.toString().padStart(3, '0');
-    
-    // Map reciter IDs to their audio directory names
-    const reciterAudioMap: Record<string, string> = {
-      'almatroud': 'Almatroud_128kbps',
-      'mishary-alafasy': 'Alafasy_128kbps',
-      'abdur-rahman-sudais': 'Abdurrahman_As-Sudais_192kbps',
-      'maher-al-muaiqly': 'Maher_AlMuaiqly_128kbps',
-      'abdullah-basfar': 'Abdullah_Basfar_192kbps',
-      'saad-al-ghamdi': 'Saad_Al-Ghamdi_128kbps',
-      'ali-al-hudhaify': 'Ali_Al-Hudhaify_128kbps',
-      'abu-bakr-al-shatri': 'Abu_Bakr_Al-Shatri_128kbps',
-      'ahmad-al-ajmi': 'Ahmad_Al-Ajmi_128kbps',
-      'mohamed-siddiq-al-minshawi': 'Minshawi_Mujawwad_128kbps',
-      'mohamed-al-tablawi': 'Tablawi_128kbps',
-      'aliyu-jabir': 'Aliyu_Jabir_128kbps',
-      'bandar-baleela': 'Bandar_Baleela_192kbps',
-      'yasser-al-dosari': 'Yasser_Al-Dosari_128kbps',
-      'khalid-al-jalil': 'Khalid_Al-Jalil_128kbps',
-      'nasser-al-qatami': 'Nasser_Al-Qatami_128kbps',
-      'fares-abbad': 'Fares_Abbad_128kbps',
-      'salah-al-budair': 'Salah_Al-Budair_128kbps',
-      'omar-al-kazabri': 'Omar_Al-Kazabri_128kbps',
-      'idris-abkar': 'Idris_Abkar_128kbps'
-    };
-    
-    const reciterFolder = reciterAudioMap[currentReciterRef.current] || 'Alafasy_128kbps';
-    
-    // Primary source: EveryAyah.com (most reliable)
-    const primaryUrl = `https://everyayah.com/data/${reciterFolder}/${paddedSurah}${paddedAyah}.mp3`;
-    
+  const getAudioUrl = useCallback(async (surahNumber: number, ayahNumber: number): Promise<string> => {
     console.log(`Getting audio URL for Surah ${surahNumber}, Ayah ${ayahNumber}, Reciter: ${currentReciterRef.current}`);
-    console.log('Audio URL:', primaryUrl);
     
-    return primaryUrl;
+    try {
+      // Use the download service to get the best available audio URI (local or online)
+      const audioUri = await audioDownloadService.getAudioUri(
+        currentReciterRef.current,
+        surahNumber,
+        ayahNumber
+      );
+      
+      console.log('Audio URI:', audioUri);
+      return audioUri;
+    } catch (error) {
+      console.error('Error getting audio URI:', error);
+      // Fallback to online URL if service fails
+      const paddedSurah = surahNumber.toString().padStart(3, '0');
+      const paddedAyah = ayahNumber.toString().padStart(3, '0');
+      const fallbackUrl = `https://everyayah.com/data/Alafasy_128kbps/${paddedSurah}${paddedAyah}.mp3`;
+      console.log('Using fallback URL:', fallbackUrl);
+      return fallbackUrl;
+    }
   }, []);
 
   // Forward declaration for playAudio function
@@ -160,7 +146,7 @@ export function useAudioPlayer(): AudioPlayerState & AudioPlayerActions {
           }
           
           // Replay the same ayah
-          const url = getAudioUrl(currentSurah, currentAyah);
+          const url = await getAudioUrl(currentSurah, currentAyah);
           playAudioFunction(url, true);
         }, 100);
         
@@ -196,7 +182,7 @@ export function useAudioPlayer(): AudioPlayerState & AudioPlayerActions {
         }
 
         try {
-          const url = getAudioUrl(currentSurah, nextAyah);
+          const url = await getAudioUrl(currentSurah, nextAyah);
           playAudioFunction(url, true);
         } catch (error) {
           console.error('Error playing next ayah:', error);
@@ -353,7 +339,7 @@ export function useAudioPlayer(): AudioPlayerState & AudioPlayerActions {
         isPlaying: false
       }));
 
-      const url = getAudioUrl(surahNumber, ayahNumber);
+      const url = await getAudioUrl(surahNumber, ayahNumber);
       await playAudio(url, false);
     } catch (error) {
       console.error('Error playing ayah:', error);
@@ -376,7 +362,7 @@ export function useAudioPlayer(): AudioPlayerState & AudioPlayerActions {
       }));
 
       // Start playing the first ayah and let the playback system handle the rest
-      const url = getAudioUrl(surahNumber, 1);
+      const url = await getAudioUrl(surahNumber, 1);
       await playAudio(url, true);
       
     } catch (error) {
@@ -397,7 +383,7 @@ export function useAudioPlayer(): AudioPlayerState & AudioPlayerActions {
         currentRepeat: 0
       }));
 
-      const url = getAudioUrl(surahNumber, start);
+      const url = await getAudioUrl(surahNumber, start);
       await playAudio(url, true);
     } catch (error) {
       console.error('Error playing range:', error);

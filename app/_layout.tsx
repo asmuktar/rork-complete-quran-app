@@ -4,6 +4,7 @@ import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { trpc, trpcClient } from "@/lib/trpc";
+import audioDownloadService from "@/services/audio-download-service";
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
@@ -34,7 +35,21 @@ function RootLayoutNav() {
 
 export default function RootLayout() {
   useEffect(() => {
-    SplashScreen.hideAsync();
+    const initializeApp = async () => {
+      try {
+        // Initialize default reciters in the background
+        audioDownloadService.initializeDefaultReciters().catch(error => {
+          console.error('Failed to initialize default reciters:', error);
+        });
+        
+        await SplashScreen.hideAsync();
+      } catch (error) {
+        console.error('Error initializing app:', error);
+        await SplashScreen.hideAsync();
+      }
+    };
+    
+    initializeApp();
   }, []);
 
   return (

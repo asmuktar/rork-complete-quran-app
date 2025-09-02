@@ -1,14 +1,31 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Users, User, MapPin, Star, Volume2 } from 'lucide-react-native';
+import { Users, User, MapPin, Star, Volume2, Download, CheckCircle } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { Colors } from '@/constants/colors';
 import { TOP_RECITERS, getTopReciters } from '@/constants/reciters';
+import audioDownloadService from '@/services/audio-download-service';
 
 export default function RecitersScreen() {
   const reciters = getTopReciters();
+  const [downloadedReciters, setDownloadedReciters] = useState<Set<string>>(new Set());
+  const [defaultReciters] = useState<Set<string>>(new Set(audioDownloadService.getDefaultReciters()));
+
+  useEffect(() => {
+    loadDownloadStatus();
+  }, []);
+
+  const loadDownloadStatus = async () => {
+    try {
+      const downloaded = await audioDownloadService.getDownloadedReciters();
+      const downloadedIds = new Set(downloaded.map(r => r.reciterId));
+      setDownloadedReciters(downloadedIds);
+    } catch (error) {
+      console.error('Error loading download status:', error);
+    }
+  };
 
   const handleReciterPress = (reciterId: string) => {
     router.push(`/reciter/${reciterId}` as any);
@@ -16,6 +33,8 @@ export default function RecitersScreen() {
 
   const renderReciter = (reciter: typeof TOP_RECITERS[0], index: number) => {
     const isTopThree = index < 3;
+    const isDownloaded = downloadedReciters.has(reciter.id);
+    const isDefault = defaultReciters.has(reciter.id);
     
     return (
       <TouchableOpacity
@@ -56,7 +75,7 @@ export default function RecitersScreen() {
                 <View style={styles.metaItem}>
                   <MapPin size={14} color={isTopThree ? 'rgba(255, 255, 255, 0.8)' : Colors.textLight} />
                   <Text style={[styles.metaText, isTopThree && styles.topMetaText]}>
-                    {reciter.country}
+                    {reciter.country}{isDefault ? ' • Default' : ''}
                   </Text>
                 </View>
                 <View style={styles.metaItem}>
@@ -72,15 +91,27 @@ export default function RecitersScreen() {
               </Text>
             </View>
             
-            <TouchableOpacity 
-              style={[styles.playButton, isTopThree && styles.topPlayButton]}
-              onPress={(e) => {
-                e.stopPropagation();
-                handleReciterPress(reciter.id);
-              }}
-            >
-              <Volume2 size={20} color={isTopThree ? Colors.textOnPrimary : Colors.primary} />
-            </TouchableOpacity>
+            <View style={styles.reciterActions}>
+              {isDownloaded && (
+                <View style={[styles.statusBadge, styles.downloadedBadge]}>
+                  <CheckCircle size={14} color={Colors.success} />
+                </View>
+              )}
+              {isDefault && !isDownloaded && (
+                <View style={[styles.statusBadge, styles.defaultBadge]}>
+                  <Download size={14} color={Colors.primary} />
+                </View>
+              )}
+              <TouchableOpacity 
+                style={[styles.playButton, isTopThree && styles.topPlayButton]}
+                onPress={(e) => {
+                  e.stopPropagation();
+                  handleReciterPress(reciter.id);
+                }}
+              >
+                <Volume2 size={20} color={isTopThree ? Colors.textOnPrimary : Colors.primary} />
+              </TouchableOpacity>
+            </View>
           </View>
           
           {/* Specialties */}
@@ -335,5 +366,26 @@ const styles = StyleSheet.create({
     color: Colors.textLight,
     textAlign: 'center',
     fontWeight: '500',
+  },
+  reciterActions: {
+    alignItems: 'center',
+    gap: 8,
+  },
+  statusBadge: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  downloadedBadge: {
+    backgroundColor: 'rgba(34, 197, 94, 0.1)',
+    borderWidth: 1,
+    borderColor: Colors.success,
+  },
+  defaultBadge: {
+    backgroundColor: Colors.primaryOverlay,
+    borderWidth: 1,
+    borderColor: Colors.primary,
   },
 });

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -7,6 +7,8 @@ import { useLocalSearchParams, Stack } from 'expo-router';
 import { Colors } from '@/constants/colors';
 import { TOP_RECITERS } from '@/constants/reciters';
 import { useAudioPlayer } from '@/hooks/use-audio-player';
+import DownloadManager from '@/components/DownloadManager';
+import audioDownloadService from '@/services/audio-download-service';
 
 export default function ReciterDetailScreen() {
   const { id } = useLocalSearchParams();
@@ -16,6 +18,21 @@ export default function ReciterDetailScreen() {
   
   const [isLiked, setIsLiked] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isDownloaded, setIsDownloaded] = useState(false);
+  const [showDownloadManager, setShowDownloadManager] = useState(false);
+
+  useEffect(() => {
+    checkDownloadStatus();
+  }, [reciterId]);
+
+  const checkDownloadStatus = async () => {
+    try {
+      const downloaded = await audioDownloadService.isReciterDownloaded(reciterId);
+      setIsDownloaded(downloaded);
+    } catch (error) {
+      console.error('Error checking download status:', error);
+    }
+  };
 
   if (!reciter) {
     return (
@@ -55,7 +72,12 @@ export default function ReciterDetailScreen() {
   };
 
   const handleDownload = () => {
-    Alert.alert('Download', `Download recitations by ${reciter.name}`);
+    setShowDownloadManager(true);
+  };
+
+  const handleDownloadComplete = () => {
+    checkDownloadStatus();
+    setShowDownloadManager(false);
   };
 
   return (
@@ -92,6 +114,10 @@ export default function ReciterDetailScreen() {
             <View style={styles.statItem}>
               <Text style={styles.statValue}>{reciter.audioQuality}</Text>
               <Text style={styles.statLabel}>Quality</Text>
+            </View>
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>{isDownloaded ? 'Yes' : 'No'}</Text>
+              <Text style={styles.statLabel}>Downloaded</Text>
             </View>
           </View>
         </View>
@@ -130,10 +156,32 @@ export default function ReciterDetailScreen() {
           <Share2 size={20} color={Colors.primary} />
         </TouchableOpacity>
         
-        <TouchableOpacity style={styles.secondaryButton} onPress={handleDownload}>
-          <Download size={20} color={Colors.primary} />
+        <TouchableOpacity 
+          style={[styles.secondaryButton, isDownloaded && styles.downloadedButton]} 
+          onPress={handleDownload}
+        >
+          <Download size={20} color={isDownloaded ? Colors.success : Colors.primary} />
         </TouchableOpacity>
       </View>
+
+      {/* Download Manager Modal */}
+      {showDownloadManager && (
+        <View style={styles.downloadManagerContainer}>
+          <View style={styles.downloadManagerHeader}>
+            <Text style={styles.downloadManagerTitle}>Download Manager</Text>
+            <TouchableOpacity 
+              style={styles.closeButton}
+              onPress={() => setShowDownloadManager(false)}
+            >
+              <Text style={styles.closeButtonText}>✕</Text>
+            </TouchableOpacity>
+          </View>
+          <DownloadManager 
+            reciterId={reciterId} 
+            onDownloadComplete={handleDownloadComplete}
+          />
+        </View>
+      )}
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Description */}
@@ -432,5 +480,52 @@ const styles = StyleSheet.create({
     color: Colors.textLight,
     textAlign: 'center',
     fontWeight: '500',
+  },
+  downloadedButton: {
+    backgroundColor: 'rgba(34, 197, 94, 0.1)',
+    borderWidth: 1,
+    borderColor: Colors.success,
+  },
+  downloadManagerContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    zIndex: 1000,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  downloadManagerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: Colors.surface,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.surfaceVariant,
+  },
+  downloadManagerTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: Colors.text,
+  },
+  closeButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: Colors.surfaceVariant,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  closeButtonText: {
+    fontSize: 16,
+    color: Colors.textSecondary,
+    fontWeight: 'bold',
   },
 });
