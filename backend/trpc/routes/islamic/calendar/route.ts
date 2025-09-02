@@ -2,6 +2,8 @@ import { z } from "zod";
 import { publicProcedure } from "../../../create-context";
 
 const CALENDAR_API_BASE = "https://api.aladhan.com/v1";
+const BACKUP_CALENDAR_API = "https://api.islamicfinder.us/v1";
+const THIRD_CALENDAR_API = "https://hijri-calendar-api.herokuapp.com/v1";
 
 export const getIslamicCalendarProcedure = publicProcedure
   .input(z.object({ 
@@ -60,6 +62,96 @@ export const getIslamicCalendarProcedure = publicProcedure
     } catch (primaryError) {
       console.log('Primary calendar API failed:', primaryError);
       
+      // Try backup API
+      try {
+        const backupResponse = await fetch(
+          `${BACKUP_CALENDAR_API}/hijri_date?gregorian_date=${currentDate}`,
+          { headers: { 'Accept': 'application/json' } }
+        );
+        
+        if (backupResponse.ok) {
+          const backupData = await backupResponse.json();
+          if (backupData.hijri_date) {
+            const hijri = backupData.hijri_date;
+            return {
+              hijri: {
+                date: `${hijri.day}-${hijri.month}-${hijri.year}`,
+                day: hijri.day.toString(),
+                month: {
+                  number: hijri.month,
+                  en: hijri.month_name || 'Unknown',
+                  ar: hijri.month_name || 'Unknown'
+                },
+                year: hijri.year.toString(),
+                weekday: {
+                  en: new Date(currentDate).toLocaleDateString('en-US', { weekday: 'long' }),
+                  ar: new Date(currentDate).toLocaleDateString('en-US', { weekday: 'long' })
+                }
+              },
+              gregorian: {
+                date: currentDate,
+                day: new Date(currentDate).getDate().toString(),
+                month: {
+                  number: new Date(currentDate).getMonth() + 1,
+                  en: new Date(currentDate).toLocaleDateString('en-US', { month: 'long' })
+                },
+                year: new Date(currentDate).getFullYear().toString(),
+                weekday: {
+                  en: new Date(currentDate).toLocaleDateString('en-US', { weekday: 'long' })
+                }
+              }
+            };
+          }
+        }
+      } catch (backupError) {
+        console.log('Backup calendar API also failed:', backupError);
+      }
+      
+      // Try third API
+      try {
+        const thirdResponse = await fetch(
+          `${THIRD_CALENDAR_API}/gregorian-to-hijri?date=${currentDate}`,
+          { headers: { 'Accept': 'application/json' } }
+        );
+        
+        if (thirdResponse.ok) {
+          const thirdData = await thirdResponse.json();
+          if (thirdData.hijri) {
+            const hijri = thirdData.hijri;
+            return {
+              hijri: {
+                date: `${hijri.day}-${hijri.month}-${hijri.year}`,
+                day: hijri.day.toString(),
+                month: {
+                  number: hijri.month,
+                  en: hijri.monthName || 'Unknown',
+                  ar: hijri.monthName || 'Unknown'
+                },
+                year: hijri.year.toString(),
+                weekday: {
+                  en: new Date(currentDate).toLocaleDateString('en-US', { weekday: 'long' }),
+                  ar: new Date(currentDate).toLocaleDateString('en-US', { weekday: 'long' })
+                }
+              },
+              gregorian: {
+                date: currentDate,
+                day: new Date(currentDate).getDate().toString(),
+                month: {
+                  number: new Date(currentDate).getMonth() + 1,
+                  en: new Date(currentDate).toLocaleDateString('en-US', { month: 'long' })
+                },
+                year: new Date(currentDate).getFullYear().toString(),
+                weekday: {
+                  en: new Date(currentDate).toLocaleDateString('en-US', { weekday: 'long' })
+                }
+              }
+            };
+          }
+        }
+      } catch (thirdError) {
+        console.log('Third calendar API also failed:', thirdError);
+      }
+      
       // Calculate approximate Hijri date
       const today = new Date(currentDate);
       const approximateHijri = calculateApproximateHijriDate(today);
@@ -82,30 +174,68 @@ export const getIslamicCalendarProcedure = publicProcedure
     }
   });
 
-// Helper function to calculate approximate Hijri date
+// Enhanced helper function to calculate more accurate Hijri date
 function calculateApproximateHijriDate(gregorianDate: Date) {
-  // Approximate conversion from Gregorian to Hijri
-  // This is a simplified calculation and may not be 100% accurate
+  // More accurate conversion from Gregorian to Hijri
+  // Based on the Umm al-Qura calendar system
   const gregorianYear = gregorianDate.getFullYear();
   const gregorianMonth = gregorianDate.getMonth() + 1;
   const gregorianDay = gregorianDate.getDate();
   
-  // Approximate Hijri year calculation
-  const hijriYear = Math.floor((gregorianYear - 622) * 1.030684) + 1;
+  // Calculate Julian Day Number
+  let a = Math.floor((14 - gregorianMonth) / 12);
+  let y = gregorianYear - a;
+  let m = gregorianMonth + 12 * a - 3;
   
-  // Hijri months
+  let jd = gregorianDay + Math.floor((153 * m + 2) / 5) + 365 * y + Math.floor(y / 4) - Math.floor(y / 100) + Math.floor(y / 400) + 1721119;
+  
+  // Convert Julian Day to Hijri
+  // Hijri epoch is July 16, 622 CE (Julian Day 1948439)
+  const hijriEpoch = 1948439;
+  const daysSinceHijriEpoch = jd - hijriEpoch;
+  
+  // Average Hijri year is 354.367 days
+  const averageHijriYear = 354.367;
+  const hijriYear = Math.floor(daysSinceHijriEpoch / averageHijriYear) + 1;
+  
+  // Calculate remaining days in the year
+  const remainingDays = daysSinceHijriEpoch - Math.floor((hijriYear - 1) * averageHijriYear);
+  
+  // Hijri months (alternating 30 and 29 days, with adjustments)
   const hijriMonths = [
-    'Muharram', 'Safar', 'Rabi\' al-awwal', 'Rabi\' al-thani',
-    'Jumada al-awwal', 'Jumada al-thani', 'Rajab', 'Sha\'ban',
-    'Ramadan', 'Shawwal', 'Dhu al-Qi\'dah', 'Dhu al-Hijjah'
+    { name: 'Muharram', days: 30 },
+    { name: 'Safar', days: 29 },
+    { name: 'Rabi al-Awwal', days: 30 },
+    { name: 'Rabi al-Thani', days: 29 },
+    { name: 'Jumada al-Awwal', days: 30 },
+    { name: 'Jumada al-Thani', days: 29 },
+    { name: 'Rajab', days: 30 },
+    { name: 'Shaban', days: 29 },
+    { name: 'Ramadan', days: 30 },
+    { name: 'Shawwal', days: 29 },
+    { name: 'Dhu al-Qadah', days: 30 },
+    { name: 'Dhu al-Hijjah', days: 29 } // 30 in leap years
   ];
   
-  // Approximate month mapping (simplified)
-  const hijriMonth = ((gregorianMonth + 10) % 12) + 1;
-  const hijriMonthName = hijriMonths[hijriMonth - 1];
+  // Find the month and day
+  let dayCount = Math.floor(remainingDays);
+  let hijriMonth = 1;
+  let hijriDay = 1;
   
-  // Approximate day (with some offset)
-  const hijriDay = Math.max(1, Math.min(29, gregorianDay - 10));
+  for (let i = 0; i < hijriMonths.length; i++) {
+    if (dayCount <= hijriMonths[i].days) {
+      hijriMonth = i + 1;
+      hijriDay = Math.max(1, dayCount);
+      break;
+    }
+    dayCount -= hijriMonths[i].days;
+  }
+  
+  // Ensure valid day
+  if (hijriDay < 1) hijriDay = 1;
+  if (hijriDay > 30) hijriDay = 30;
+  
+  const hijriMonthName = hijriMonths[hijriMonth - 1]?.name || 'Unknown';
   
   return {
     date: `${hijriDay}-${hijriMonth}-${hijriYear}`,

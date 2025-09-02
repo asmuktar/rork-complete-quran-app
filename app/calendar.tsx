@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Calendar, Moon, Star, RefreshCw } from 'lucide-react-native';
 import { Colors } from '@/constants/colors';
-import { getIslamicDate } from '@/services/islamic-apis';
+import { trpc } from '@/lib/trpc';
 
 interface IslamicEvent {
   name: string;
@@ -62,24 +62,39 @@ const ISLAMIC_EVENTS: IslamicEvent[] = [
 export default function IslamicCalendarScreen() {
   const [currentHijriDate, setCurrentHijriDate] = useState<string>('');
   const [currentGregorianDate, setCurrentGregorianDate] = useState<string>('');
-  const [loading, setLoading] = useState(true);
+
+  const calendarQuery = trpc.islamic.getCalendar.useQuery(
+    { date: new Date().toISOString().split('T')[0] },
+    {
+      retry: 3,
+      refetchOnWindowFocus: false,
+    }
+  );
+
+  const eventsQuery = trpc.islamic.getEvents.useQuery(
+    { year: new Date().getFullYear() },
+    {
+      retry: 2,
+      refetchOnWindowFocus: false,
+    }
+  );
 
   useEffect(() => {
-    loadCurrentDate();
-  }, []);
-
-  const loadCurrentDate = async () => {
-    try {
-      setLoading(true);
-      const dateData = await getIslamicDate();
-      setCurrentHijriDate(dateData.hijri);
-      setCurrentGregorianDate(dateData.gregorian);
-    } catch (error) {
-      console.error('Error loading Islamic date:', error);
-      Alert.alert('Error', 'Failed to load Islamic date.');
-    } finally {
-      setLoading(false);
+    if (calendarQuery.data?.hijri) {
+      setCurrentHijriDate(`${calendarQuery.data.hijri.day} ${calendarQuery.data.hijri.month.en} ${calendarQuery.data.hijri.year} AH`);
+      setCurrentGregorianDate(calendarQuery.data.gregorian.date);
     }
+  }, [calendarQuery.data]);
+
+  useEffect(() => {
+    if (calendarQuery.error) {
+      console.error('Error loading Islamic date:', calendarQuery.error);
+    }
+  }, [calendarQuery.error]);
+
+  const loadCurrentDate = () => {
+    calendarQuery.refetch();
+    eventsQuery.refetch();
   };
 
   const formatGregorianDate = (dateString: string) => {
@@ -110,7 +125,7 @@ export default function IslamicCalendarScreen() {
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Current Date */}
         <View style={styles.currentDateCard}>
-          {loading ? (
+          {calendarQuery.isLoading ? (
             <View style={styles.loadingContainer}>
               <RefreshCw size={24} color={Colors.primary} />
               <Text style={styles.loadingText}>Loading date...</Text>
@@ -124,7 +139,11 @@ export default function IslamicCalendarScreen() {
                 </Text>
               </View>
               
-              <TouchableOpacity style={styles.refreshButton} onPress={loadCurrentDate}>
+              <TouchableOpacity 
+                style={styles.refreshButton} 
+                onPress={loadCurrentDate}
+                disabled={calendarQuery.isLoading}
+              >
                 <RefreshCw size={16} color={Colors.primary} />
                 <Text style={styles.refreshText}>Refresh</Text>
               </TouchableOpacity>
@@ -161,26 +180,56 @@ export default function IslamicCalendarScreen() {
 
         {/* Important Events */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Important Islamic Events</Text>
-          {ISLAMIC_EVENTS.map((event, index) => (
-            <View key={index} style={styles.eventCard}>
-              <View style={styles.eventHeader}>
-                <View style={styles.eventIcon}>
-                  {event.type === 'major' ? (
-                    <Star size={20} color={Colors.islamicGold} />
-                  ) : (
-                    <Moon size={20} color={Colors.primary} />
-                  )}
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Important Islamic Events</Text>
+            {eventsQuery.isLoading && (
+              <Text style={styles.loadingText}>Loading...</Text>
+            )}
+            {eventsQuery.error && (
+              <Text style={styles.errorText}>Failed to load events</Text>
+            )}
+          </View>
+          
+          {eventsQuery.data ? (
+            eventsQuery.data.map((event, index) => (
+              <View key={index} style={styles.eventCard}>
+                <View style={styles.eventHeader}>
+                  <View style={styles.eventIcon}>
+                    {event.type === 'celebration' ? (
+                      <Star size={20} color={Colors.islamicGold} />
+                    ) : (
+                      <Moon size={20} color={Colors.primary} />
+                    )}
+                  </View>
+                  <View style={styles.eventInfo}>
+                    <Text style={styles.eventName}>{event.name}</Text>
+                    <Text style={styles.eventDate}>{new Date(event.date).toLocaleDateString()}</Text>
+                  </View>
+                  <Text style={styles.eventType}>{event.type}</Text>
                 </View>
-                <View style={styles.eventInfo}>
-                  <Text style={styles.eventName}>{event.name}</Text>
-                  <Text style={styles.eventArabicName}>{event.arabicName}</Text>
-                </View>
-                <Text style={styles.eventDate}>{event.date}</Text>
               </View>
-              <Text style={styles.eventDescription}>{event.description}</Text>
-            </View>
-          ))}
+            ))
+          ) : (
+            ISLAMIC_EVENTS.map((event, index) => (
+              <View key={index} style={styles.eventCard}>
+                <View style={styles.eventHeader}>
+                  <View style={styles.eventIcon}>
+                    {event.type === 'major' ? (
+                      <Star size={20} color={Colors.islamicGold} />
+                    ) : (
+                      <Moon size={20} color={Colors.primary} />
+                    )}
+                  </View>
+                  <View style={styles.eventInfo}>
+                    <Text style={styles.eventName}>{event.name}</Text>
+                    <Text style={styles.eventArabicName}>{event.arabicName}</Text>
+                  </View>
+                  <Text style={styles.eventDate}>{event.date}</Text>
+                </View>
+                <Text style={styles.eventDescription}>{event.description}</Text>
+              </View>
+            ))
+          )}
         </View>
 
         {/* Info Card */}
@@ -367,6 +416,22 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: Colors.textLight,
     fontWeight: '500',
+  },
+  eventType: {
+    fontSize: 12,
+    color: Colors.primary,
+    fontWeight: '500',
+    textTransform: 'capitalize',
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  errorText: {
+    fontSize: 12,
+    color: Colors.error || '#ff4444',
   },
   eventDescription: {
     fontSize: 14,

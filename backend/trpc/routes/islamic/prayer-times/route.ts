@@ -3,6 +3,7 @@ import { publicProcedure } from "../../../create-context";
 
 const PRAYER_API_BASE = "https://api.aladhan.com/v1";
 const BACKUP_API_BASE = "https://api.pray.zone/v2";
+const THIRD_API_BASE = "https://api.islamicfinder.us/v1";
 
 export const getPrayerTimesProcedure = publicProcedure
   .input(z.object({ 
@@ -79,6 +80,48 @@ export const getPrayerTimesProcedure = publicProcedure
         console.log('Backup API also failed:', backupError);
       }
       
+      // Try third API - Islamic Finder
+      try {
+        const thirdResponse = await fetch(
+          `${THIRD_API_BASE}/prayer_times?latitude=${input.latitude}&longitude=${input.longitude}&method=${input.method}&date=${date}`,
+          { 
+            headers: { 'Accept': 'application/json' }
+          }
+        );
+        
+        if (thirdResponse.ok) {
+          const thirdData = await thirdResponse.json();
+          if (thirdData.prayer_times) {
+            const times = thirdData.prayer_times;
+            return {
+              timings: {
+                Fajr: times.fajr || times.Fajr,
+                Sunrise: times.sunrise || times.Sunrise,
+                Dhuhr: times.dhuhr || times.Dhuhr,
+                Asr: times.asr || times.Asr,
+                Maghrib: times.maghrib || times.Maghrib,
+                Isha: times.isha || times.Isha
+              },
+              date: {
+                readable: new Date().toLocaleDateString(),
+                timestamp: Date.now().toString()
+              },
+              meta: {
+                latitude: input.latitude,
+                longitude: input.longitude,
+                timezone: 'Local',
+                method: {
+                  id: input.method,
+                  name: 'Islamic Finder API'
+                }
+              }
+            };
+          }
+        }
+      } catch (thirdError) {
+        console.log('Third API also failed:', thirdError);
+      }
+      
       // Calculate approximate prayer times based on location
       const approximateTimes = calculateApproximatePrayerTimes(input.latitude, input.longitude);
       
@@ -101,32 +144,74 @@ export const getPrayerTimesProcedure = publicProcedure
     }
   });
 
-// Helper function to calculate approximate prayer times
+// Enhanced helper function to calculate more accurate prayer times
 function calculateApproximatePrayerTimes(latitude: number, longitude: number) {
   const now = new Date();
   const dayOfYear = Math.floor((now.getTime() - new Date(now.getFullYear(), 0, 0).getTime()) / 86400000);
   
-  // Simplified calculation based on sun position
-  // This is a very basic approximation
+  // More accurate solar calculations
+  const P = Math.asin(0.39795 * Math.cos(0.98563 * (dayOfYear - 173) * Math.PI / 180));
+  const argument = -Math.tan(latitude * Math.PI / 180) * Math.tan(P);
   
-  // Solar declination (simplified)
-  const declination = 23.45 * Math.sin((360 / 365) * (dayOfYear - 81) * Math.PI / 180);
+  // Check for polar regions
+  if (Math.abs(argument) > 1) {
+    // Use default times for polar regions
+    return {
+      Fajr: "05:00",
+      Sunrise: "06:30",
+      Dhuhr: "12:30",
+      Asr: "15:30",
+      Maghrib: "18:30",
+      Isha: "20:00"
+    };
+  }
   
-  // Hour angle calculations (simplified)
-  const latRad = latitude * Math.PI / 180;
-  const declRad = declination * Math.PI / 180;
+  const A = Math.acos(argument) * 180 / Math.PI / 15;
   
-  const sunrise = 12 - (1/15) * Math.acos(-Math.tan(latRad) * Math.tan(declRad)) * 180 / Math.PI;
-  const sunset = 12 + (1/15) * Math.acos(-Math.tan(latRad) * Math.tan(declRad)) * 180 / Math.PI;
+  // Calculate solar noon (accounting for longitude)
+  const solarNoon = 12 - longitude / 15;
   
-  // Approximate prayer times
-  const fajr = sunrise - 1.5;
-  const dhuhr = 12.5;
-  const asr = dhuhr + 3.5;
-  const maghrib = sunset + 0.2;
-  const isha = maghrib + 1.5;
+  // Calculate sunrise and sunset
+  const sunrise = solarNoon - A;
+  const sunset = solarNoon + A;
+  
+  // Calculate prayer times with more accurate angles
+  const fajrAngle = 18; // Standard Fajr angle
+  const ishaAngle = 17; // Standard Isha angle
+  
+  const fajrArgument = -Math.tan(latitude * Math.PI / 180) * Math.tan(P) - Math.sin(fajrAngle * Math.PI / 180) / (Math.cos(latitude * Math.PI / 180) * Math.cos(P));
+  const ishaArgument = -Math.tan(latitude * Math.PI / 180) * Math.tan(P) - Math.sin(ishaAngle * Math.PI / 180) / (Math.cos(latitude * Math.PI / 180) * Math.cos(P));
+  
+  let fajr, isha;
+  
+  if (Math.abs(fajrArgument) <= 1) {
+    const fajrA = Math.acos(fajrArgument) * 180 / Math.PI / 15;
+    fajr = solarNoon - fajrA;
+  } else {
+    fajr = sunrise - 1.5; // Fallback
+  }
+  
+  if (Math.abs(ishaArgument) <= 1) {
+    const ishaA = Math.acos(ishaArgument) * 180 / Math.PI / 15;
+    isha = solarNoon + ishaA;
+  } else {
+    isha = sunset + 1.5; // Fallback
+  }
+  
+  // Calculate Asr time (when shadow length = object length + shadow at noon)
+  const asrArgument = Math.sin(Math.atan(1 + Math.tan(Math.abs(latitude * Math.PI / 180 - P)))) / (Math.cos(latitude * Math.PI / 180) * Math.cos(P)) - Math.tan(latitude * Math.PI / 180) * Math.tan(P);
+  let asr;
+  
+  if (Math.abs(asrArgument) <= 1) {
+    const asrA = Math.acos(asrArgument) * 180 / Math.PI / 15;
+    asr = solarNoon + asrA;
+  } else {
+    asr = solarNoon + 3.5; // Fallback
+  }
   
   const formatTime = (time: number) => {
+    // Ensure time is within 24-hour format
+    time = ((time % 24) + 24) % 24;
     const hours = Math.floor(time);
     const minutes = Math.floor((time - hours) * 60);
     return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
@@ -135,9 +220,9 @@ function calculateApproximatePrayerTimes(latitude: number, longitude: number) {
   return {
     Fajr: formatTime(fajr),
     Sunrise: formatTime(sunrise),
-    Dhuhr: formatTime(dhuhr),
+    Dhuhr: formatTime(solarNoon),
     Asr: formatTime(asr),
-    Maghrib: formatTime(maghrib),
+    Maghrib: formatTime(sunset),
     Isha: formatTime(isha)
   };
 }
