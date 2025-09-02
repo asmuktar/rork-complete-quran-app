@@ -59,6 +59,7 @@ export const Colors = {
   primaryOverlay: 'rgba(46, 125, 50, 0.1)',
   secondaryOverlay: 'rgba(212, 175, 55, 0.1)',
   goldOverlay: 'rgba(212, 175, 55, 0.15)',
+  errorOverlay: 'rgba(231, 76, 60, 0.1)',
 };
 
 // Legacy support

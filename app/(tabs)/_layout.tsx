@@ -1,5 +1,5 @@
 import { Tabs } from "expo-router";
-import { Home, Search, BookOpen, Clock, MoreHorizontal } from "lucide-react-native";
+import { Home, Search, BookOpen, Clock, MoreHorizontal, Brain } from "lucide-react-native";
 import React from "react";
 import { Colors } from "@/constants/colors";
 
@@ -49,6 +49,13 @@ export default function TabLayout() {
         options={{
           title: "Hadith",
           tabBarIcon: ({ color, size }) => <BookOpen color={color} size={size} />,
+        }}
+      />
+      <Tabs.Screen
+        name="hafiz"
+        options={{
+          title: "Hafiz",
+          tabBarIcon: ({ color, size }) => <Brain color={color} size={size} />,
         }}
       />
       <Tabs.Screen

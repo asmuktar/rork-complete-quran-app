@@ -1,15 +1,17 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Play, Pause, Square, Settings, Bookmark, BookmarkCheck, Volume2, SkipBack, SkipForward, Repeat } from 'lucide-react-native';
-import { useLocalSearchParams, Stack } from 'expo-router';
+import { Play, Pause, Square, Settings, Bookmark, BookmarkCheck, Volume2, SkipBack, SkipForward, Repeat, Brain, Target, CheckCircle2, XCircle } from 'lucide-react-native';
+import { useLocalSearchParams, Stack, router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors } from '@/constants/colors';
 import { getSurahById, Ayah } from '@/constants/quran-data';
 import { useAudioPlayer } from '@/hooks/use-audio-player';
 import { TOP_RECITERS } from '@/constants/reciters';
+import { HafizProvider, useHafiz } from '@/contexts/hafiz-context';
+import MemoryTestModal from '@/components/MemoryTestModal';
 
-export default function SurahScreen() {
+function SurahScreenContent() {
   const { id } = useLocalSearchParams();
   const surahId = parseInt(id as string);
   const surah = getSurahById(surahId);
@@ -20,8 +22,11 @@ export default function SurahScreen() {
   const [selectedReciter, setSelectedReciter] = useState('mishary-alafasy');
   const [showTransliteration, setShowTransliteration] = useState(false);
   const [showReciterSelection, setShowReciterSelection] = useState(false);
+  const [showTestModal, setShowTestModal] = useState(false);
+  const [showHafizMode, setShowHafizMode] = useState(false);
   
   const audioPlayer = useAudioPlayer();
+  const { updateProgress, progress, startSession, isSessionActive } = useHafiz();
   
   useEffect(() => {
     audioPlayer.setReciter(selectedReciter);
@@ -838,3 +843,11 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
 });
+
+export default function SurahScreen() {
+  return (
+    <HafizProvider>
+      <SurahScreenContent />
+    </HafizProvider>
+  );
+}
