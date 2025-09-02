@@ -10,19 +10,22 @@ export const getIslamicCalendarProcedure = publicProcedure
     year: z.number().optional()
   }))
   .query(async ({ input }) => {
+    const currentDate = input.date || new Date().toISOString().split('T')[0];
+    
+    // Try primary API first
     try {
-      const currentDate = input.date || new Date().toISOString().split('T')[0];
       const response = await fetch(
-        `${CALENDAR_API_BASE}/gToH/${currentDate}`
+        `${CALENDAR_API_BASE}/gToH/${currentDate}`,
+        { headers: { 'Accept': 'application/json' } }
       );
       
       if (!response.ok) {
-        throw new Error('API request failed');
+        throw new Error(`Primary calendar API HTTP ${response.status}`);
       }
       
       const data = await response.json();
       
-      if (data.data && data.data.hijri) {
+      if (data.code === 200 && data.data?.hijri) {
         return {
           hijri: {
             date: data.data.hijri.date,
@@ -53,34 +56,16 @@ export const getIslamicCalendarProcedure = publicProcedure
         };
       }
       
-      throw new Error('Invalid response format');
-    } catch (error) {
-      console.error('Error fetching Islamic calendar:', error);
+      throw new Error('Primary API returned invalid data');
+    } catch (primaryError) {
+      console.log('Primary calendar API failed:', primaryError);
       
-      // Return fallback data
-      const today = new Date();
-      const hijriYear = 1445; // Approximate current Hijri year
-      const hijriMonths = [
-        'Muharram', 'Safar', 'Rabi\' al-awwal', 'Rabi\' al-thani',
-        'Jumada al-awwal', 'Jumada al-thani', 'Rajab', 'Sha\'ban',
-        'Ramadan', 'Shawwal', 'Dhu al-Qi\'dah', 'Dhu al-Hijjah'
-      ];
+      // Calculate approximate Hijri date
+      const today = new Date(currentDate);
+      const approximateHijri = calculateApproximateHijriDate(today);
       
       return {
-        hijri: {
-          date: `${today.getDate()}-${today.getMonth() + 1}-${hijriYear}`,
-          day: today.getDate().toString(),
-          month: {
-            number: today.getMonth() + 1,
-            en: hijriMonths[today.getMonth()],
-            ar: hijriMonths[today.getMonth()]
-          },
-          year: hijriYear.toString(),
-          weekday: {
-            en: today.toLocaleDateString('en-US', { weekday: 'long' }),
-            ar: today.toLocaleDateString('ar-SA', { weekday: 'long' })
-          }
-        },
+        hijri: approximateHijri,
         gregorian: {
           date: today.toISOString().split('T')[0],
           day: today.getDate().toString(),
@@ -96,6 +81,47 @@ export const getIslamicCalendarProcedure = publicProcedure
       };
     }
   });
+
+// Helper function to calculate approximate Hijri date
+function calculateApproximateHijriDate(gregorianDate: Date) {
+  // Approximate conversion from Gregorian to Hijri
+  // This is a simplified calculation and may not be 100% accurate
+  const gregorianYear = gregorianDate.getFullYear();
+  const gregorianMonth = gregorianDate.getMonth() + 1;
+  const gregorianDay = gregorianDate.getDate();
+  
+  // Approximate Hijri year calculation
+  const hijriYear = Math.floor((gregorianYear - 622) * 1.030684) + 1;
+  
+  // Hijri months
+  const hijriMonths = [
+    'Muharram', 'Safar', 'Rabi\' al-awwal', 'Rabi\' al-thani',
+    'Jumada al-awwal', 'Jumada al-thani', 'Rajab', 'Sha\'ban',
+    'Ramadan', 'Shawwal', 'Dhu al-Qi\'dah', 'Dhu al-Hijjah'
+  ];
+  
+  // Approximate month mapping (simplified)
+  const hijriMonth = ((gregorianMonth + 10) % 12) + 1;
+  const hijriMonthName = hijriMonths[hijriMonth - 1];
+  
+  // Approximate day (with some offset)
+  const hijriDay = Math.max(1, Math.min(29, gregorianDay - 10));
+  
+  return {
+    date: `${hijriDay}-${hijriMonth}-${hijriYear}`,
+    day: hijriDay.toString(),
+    month: {
+      number: hijriMonth,
+      en: hijriMonthName,
+      ar: hijriMonthName
+    },
+    year: hijriYear.toString(),
+    weekday: {
+      en: gregorianDate.toLocaleDateString('en-US', { weekday: 'long' }),
+      ar: gregorianDate.toLocaleDateString('en-US', { weekday: 'long' })
+    }
+  };
+}
 
 export const getIslamicEventsProcedure = publicProcedure
   .input(z.object({ 

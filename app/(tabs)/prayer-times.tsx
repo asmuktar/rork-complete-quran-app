@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, RefreshControl } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Clock, MapPin, Settings, Bell, Sunrise, Sun, Sunset, Moon } from 'lucide-react-native';
+import { Clock, MapPin, Settings, Bell, Sunrise, Sun, Sunset, Moon, RefreshCw } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors } from '@/constants/colors';
 import LocationService from '@/services/location-service';
@@ -29,8 +29,10 @@ export default function PrayerTimesScreen() {
   const [location, setLocation] = useState<{ latitude: number; longitude: number; address?: string } | null>(null);
   const [prayerTimes, setPrayerTimes] = useState<PrayerTimes | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [hijriDate, setHijriDate] = useState<string>('');
+  const [locationError, setLocationError] = useState<string>('');
 
   useEffect(() => {
     loadLocation();
@@ -38,21 +40,46 @@ export default function PrayerTimesScreen() {
     return () => clearInterval(timer);
   }, []);
 
+  const onRefresh = async () => {
+    await loadLocation(true);
+    // Refetch queries
+    if (location) {
+      prayerTimesQuery.refetch();
+      islamicDateQuery.refetch();
+    }
+  };
+
   // Queries will automatically run when location is available
 
-  const loadLocation = async () => {
+  const loadLocation = async (showRefreshing = false) => {
     try {
+      if (showRefreshing) setRefreshing(true);
+      setLocationError('');
+      
       const locationService = LocationService.getInstance();
       const locationData = await locationService.getCurrentLocation();
       if (locationData) {
-        // Address is already included in locationData from the service
         setLocation(locationData);
+        console.log('Location loaded:', locationData);
       }
     } catch (error) {
       console.error('Error getting location:', error);
-      Alert.alert('Location Error', 'Unable to get your location. Please enable location services.');
+      const errorMessage = error instanceof Error ? error.message : 'Unknown location error';
+      setLocationError(errorMessage);
+      
+      if (!showRefreshing) {
+        Alert.alert(
+          'Location Error', 
+          'Unable to get your location. Please enable location services and try again.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Retry', onPress: () => loadLocation() }
+          ]
+        );
+      }
     } finally {
       setLoading(false);
+      if (showRefreshing) setRefreshing(false);
     }
   };
 
@@ -63,6 +90,8 @@ export default function PrayerTimesScreen() {
     },
     {
       enabled: !!location,
+      retry: 3,
+      refetchOnWindowFocus: false,
     }
   );
 
@@ -83,7 +112,7 @@ export default function PrayerTimesScreen() {
   const islamicDateQuery = trpc.islamic.getCalendar.useQuery(
     { date: new Date().toISOString().split('T')[0] },
     {
-      retry: 1,
+      retry: 3,
       refetchOnWindowFocus: false,
     }
   );
@@ -231,20 +260,45 @@ export default function PrayerTimesScreen() {
         <Text style={styles.subtitle}>Stay connected with your prayers</Text>
       </LinearGradient>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        style={styles.content} 
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={[Colors.primary]}
+            tintColor={Colors.primary}
+          />
+        }
+      >
         {/* Current Time & Location */}
         <View style={styles.currentTimeCard}>
           <View style={styles.timeSection}>
             <Text style={styles.currentTime}>{getCurrentTimeString()}</Text>
             <Text style={styles.currentDate}>{getCurrentDateString()}</Text>
             {hijriDate && <Text style={styles.hijriDate}>{hijriDate}</Text>}
+            {islamicDateQuery.error && (
+              <Text style={styles.errorText}>Calendar data unavailable</Text>
+            )}
           </View>
           
           <View style={styles.locationSection}>
             <MapPin size={16} color={Colors.textLight} />
             <Text style={styles.locationText}>
-              {location?.address || `${location?.latitude.toFixed(2)}, ${location?.longitude.toFixed(2)}`}
+              {locationError ? (
+                <Text style={styles.errorText}>Location unavailable</Text>
+              ) : (
+                location?.address || `${location?.latitude.toFixed(2)}, ${location?.longitude.toFixed(2)}`
+              )}
             </Text>
+            <TouchableOpacity 
+              style={styles.refreshButton}
+              onPress={() => loadLocation(true)}
+              disabled={refreshing}
+            >
+              <RefreshCw size={16} color={Colors.primary} />
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -267,7 +321,15 @@ export default function PrayerTimesScreen() {
 
         {/* Prayer Times List */}
         <View style={styles.prayersList}>
-          <Text style={styles.sectionTitle}>Today&apos;s Prayer Times</Text>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Today&apos;s Prayer Times</Text>
+            {prayerTimesQuery.isLoading && (
+              <Text style={styles.loadingText}>Loading...</Text>
+            )}
+            {prayerTimesQuery.error && (
+              <Text style={styles.errorText}>Failed to load times</Text>
+            )}
+          </View>
           {prayers.map((prayer, index) => {
             const IconComponent = prayer.icon;
             return (
@@ -463,6 +525,23 @@ const styles = StyleSheet.create({
     color: Colors.textLight,
     marginLeft: 8,
     textAlign: 'center',
+    flex: 1,
+  },
+  refreshButton: {
+    marginLeft: 8,
+    padding: 4,
+  },
+  errorText: {
+    fontSize: 12,
+    color: Colors.error || '#ff4444',
+    textAlign: 'center',
+    marginTop: 4,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
   },
   nextPrayerCard: {
     backgroundColor: Colors.primary,
