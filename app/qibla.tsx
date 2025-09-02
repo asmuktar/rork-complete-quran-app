@@ -1,11 +1,13 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, Dimensions } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, Dimensions, Animated, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Compass, MapPin, Navigation, RefreshCw } from 'lucide-react-native';
+import { Compass, MapPin, Navigation, RefreshCw, Smartphone, Vibrate } from 'lucide-react-native';
 import { Colors } from '@/constants/colors';
 import { getLocation } from '@/services/location-service';
 import { trpc } from '@/lib/trpc';
+import { Magnetometer } from 'expo-sensors';
+import type { Subscription } from 'expo-sensors/build/Pedometer';
 
 const { width } = Dimensions.get('window');
 
@@ -20,11 +22,19 @@ interface QiblaData {
   distance: number;
 }
 
+
+
 export default function QiblaScreen() {
   const [location, setLocation] = useState<LocationData | null>(null);
   const [qiblaData, setQiblaData] = useState<QiblaData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [deviceHeading, setDeviceHeading] = useState<number>(0);
+  const [isCalibrated, setIsCalibrated] = useState<boolean>(false);
+  const [compassEnabled, setCompassEnabled] = useState<boolean>(true);
+  
+  const magnetometerSubscription = useRef<Subscription | null>(null);
+  const calibrationTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const loadLocation = async () => {
     setLoading(true);
@@ -86,8 +96,78 @@ export default function QiblaScreen() {
   }, [qiblaQuery.error]);
 
   useEffect(() => {
-    loadLocation();
+    const initializeQibla = async () => {
+      await loadLocation();
+      await startMagnetometer();
+    };
+    
+    initializeQibla();
+    
+    return () => {
+      stopMagnetometer();
+      if (calibrationTimeout.current) {
+        clearTimeout(calibrationTimeout.current);
+      }
+    };
   }, []);
+
+  const startMagnetometer = async () => {
+    if (Platform.OS === 'web') {
+      console.log('Magnetometer not available on web');
+      return;
+    }
+
+    try {
+      const isAvailable = await Magnetometer.isAvailableAsync();
+      if (!isAvailable) {
+        console.log('Magnetometer not available on this device');
+        setCompassEnabled(false);
+        return;
+      }
+
+      Magnetometer.setUpdateInterval(100); // Update every 100ms
+      
+      magnetometerSubscription.current = Magnetometer.addListener((data) => {
+        // Calculate heading from magnetometer data
+        const heading = Math.atan2(data.y, data.x) * (180 / Math.PI);
+        const normalizedHeading = (heading + 360) % 360;
+        
+        setDeviceHeading(normalizedHeading);
+        
+        // Auto-calibration detection
+        const magnitude = Math.sqrt(data.x * data.x + data.y * data.y + data.z * data.z);
+        if (magnitude > 25 && magnitude < 65) {
+          if (!isCalibrated) {
+            setIsCalibrated(true);
+            if (calibrationTimeout.current) {
+              clearTimeout(calibrationTimeout.current);
+            }
+            calibrationTimeout.current = setTimeout(() => {
+              setIsCalibrated(false);
+            }, 10000); // Reset calibration status after 10 seconds
+          }
+        }
+      });
+    } catch (error) {
+      console.error('Error starting magnetometer:', error);
+      setCompassEnabled(false);
+    }
+  };
+
+  const stopMagnetometer = () => {
+    if (magnetometerSubscription.current) {
+      magnetometerSubscription.current.remove();
+      magnetometerSubscription.current = null;
+    }
+  };
+
+  const calibrateCompass = () => {
+    Alert.alert(
+      'Compass Calibration',
+      'To calibrate your compass:\n\n1. Hold your device flat\n2. Rotate it in a figure-8 pattern\n3. Move it away from metal objects\n4. The compass will auto-calibrate',
+      [{ text: 'OK' }]
+    );
+  };
 
   const formatDirection = (degrees: number): string => {
     const directions = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
@@ -105,7 +185,10 @@ export default function QiblaScreen() {
   const renderCompass = () => {
     if (!qiblaData) return null;
 
-    const rotation = qiblaData.direction;
+    // Calculate the qibla direction relative to device heading
+    const qiblaDirection = compassEnabled ? 
+      (qiblaData.direction - deviceHeading + 360) % 360 : 
+      qiblaData.direction;
     
     return (
       <View style={styles.compassContainer}>
@@ -116,33 +199,53 @@ export default function QiblaScreen() {
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
           >
-            {/* Compass markings */}
-            {[0, 45, 90, 135, 180, 225, 270, 315].map((angle, index) => (
-              <View
-                key={angle}
-                style={[
-                  styles.compassMark,
-                  {
-                    transform: [{ rotate: `${angle}deg` }],
-                  },
-                ]}
-              >
-                <View style={[styles.mark, index % 2 === 0 && styles.majorMark]} />
-              </View>
-            ))}
+            {/* Compass ring with markings */}
+            <Animated.View 
+              style={[
+                styles.compassRing,
+                compassEnabled && {
+                  transform: [{ rotate: `${-deviceHeading}deg` }]
+                }
+              ]}
+            >
+              {/* Compass markings */}
+              {Array.from({ length: 36 }, (_, i) => i * 10).map((angle, index) => (
+                <View
+                  key={angle}
+                  style={[
+                    styles.compassMark,
+                    {
+                      transform: [{ rotate: `${angle}deg` }],
+                    },
+                  ]}
+                >
+                  <View style={[
+                    styles.mark, 
+                    angle % 90 === 0 && styles.majorMark,
+                    angle % 30 === 0 && angle % 90 !== 0 && styles.mediumMark
+                  ]} />
+                </View>
+              ))}
+              
+              {/* Direction labels */}
+              <Text style={[styles.directionLabel, styles.northLabel]}>N</Text>
+              <Text style={[styles.directionLabel, styles.eastLabel]}>E</Text>
+              <Text style={[styles.directionLabel, styles.southLabel]}>S</Text>
+              <Text style={[styles.directionLabel, styles.westLabel]}>W</Text>
+              
+              {/* Degree markings */}
+              <Text style={[styles.degreeLabel, { top: 25, left: '50%', marginLeft: -8 }]}>0°</Text>
+              <Text style={[styles.degreeLabel, { right: 25, top: '50%', marginTop: -8 }]}>90°</Text>
+              <Text style={[styles.degreeLabel, { bottom: 25, left: '50%', marginLeft: -12 }]}>180°</Text>
+              <Text style={[styles.degreeLabel, { left: 25, top: '50%', marginTop: -8 }]}>270°</Text>
+            </Animated.View>
             
-            {/* Direction labels */}
-            <Text style={[styles.directionLabel, styles.northLabel]}>N</Text>
-            <Text style={[styles.directionLabel, styles.eastLabel]}>E</Text>
-            <Text style={[styles.directionLabel, styles.southLabel]}>S</Text>
-            <Text style={[styles.directionLabel, styles.westLabel]}>W</Text>
-            
-            {/* Qibla arrow */}
-            <View
+            {/* Qibla arrow - always points to qibla */}
+            <Animated.View
               style={[
                 styles.qiblaArrow,
                 {
-                  transform: [{ rotate: `${rotation}deg` }],
+                  transform: [{ rotate: `${qiblaDirection}deg` }],
                 },
               ]}
             >
@@ -152,13 +255,49 @@ export default function QiblaScreen() {
                 start={{ x: 0, y: 0 }}
                 end={{ x: 0, y: 1 }}
               >
-                <Navigation size={32} color={Colors.textOnPrimary} />
+                <Navigation size={28} color={Colors.textOnPrimary} />
               </LinearGradient>
+            </Animated.View>
+            
+            {/* Device direction indicator */}
+            <View style={styles.deviceIndicator}>
+              <View style={styles.deviceArrow} />
             </View>
             
             {/* Center dot */}
             <View style={styles.centerDot} />
+            
+            {/* Calibration status */}
+            {compassEnabled && (
+              <View style={[
+                styles.calibrationStatus,
+                { backgroundColor: isCalibrated ? Colors.success : Colors.warning }
+              ]}>
+                <View style={styles.calibrationDot} />
+              </View>
+            )}
           </LinearGradient>
+        </View>
+        
+        {/* Compass controls */}
+        <View style={styles.compassControls}>
+          <TouchableOpacity 
+            style={styles.controlButton}
+            onPress={calibrateCompass}
+          >
+            <Vibrate size={20} color={Colors.primary} />
+            <Text style={styles.controlText}>Calibrate</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.controlButton}
+            onPress={() => setCompassEnabled(!compassEnabled)}
+          >
+            <Smartphone size={20} color={compassEnabled ? Colors.success : Colors.textSecondary} />
+            <Text style={[styles.controlText, { color: compassEnabled ? Colors.success : Colors.textSecondary }]}>
+              {compassEnabled ? 'Live' : 'Static'}
+            </Text>
+          </TouchableOpacity>
         </View>
       </View>
     );
@@ -223,7 +362,7 @@ export default function QiblaScreen() {
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                 >
-                  <Text style={styles.infoTitle}>Direction</Text>
+                  <Text style={styles.infoTitle}>Qibla Direction</Text>
                   <Text style={styles.infoValue}>
                     {Math.round(qiblaData.direction)}° {formatDirection(qiblaData.direction)}
                   </Text>
@@ -237,11 +376,44 @@ export default function QiblaScreen() {
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                 >
-                  <Text style={styles.infoTitle}>Distance</Text>
+                  <Text style={styles.infoTitle}>Distance to Kaaba</Text>
                   <Text style={styles.infoValue}>{formatDistance(qiblaData.distance)}</Text>
                 </LinearGradient>
               </View>
             </View>
+            
+            {/* Device heading info */}
+            {compassEnabled && (
+              <View style={styles.deviceInfoContainer}>
+                <View style={styles.deviceInfoCard}>
+                  <LinearGradient
+                    colors={['#4A90E2', '#357ABD']}
+                    style={styles.infoGradient}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                  >
+                    <Text style={styles.infoTitle}>Device Heading</Text>
+                    <Text style={styles.infoValue}>
+                      {Math.round(deviceHeading)}° {formatDirection(deviceHeading)}
+                    </Text>
+                  </LinearGradient>
+                </View>
+                
+                <View style={styles.deviceInfoCard}>
+                  <LinearGradient
+                    colors={isCalibrated ? ['#4CAF50', '#45A049'] : ['#FF9800', '#F57C00']}
+                    style={styles.infoGradient}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                  >
+                    <Text style={styles.infoTitle}>Compass Status</Text>
+                    <Text style={styles.infoValue}>
+                      {isCalibrated ? 'Calibrated' : 'Needs Calibration'}
+                    </Text>
+                  </LinearGradient>
+                </View>
+              </View>
+            )}
 
             {/* Location Info */}
             <View style={styles.locationContainer}>
@@ -260,15 +432,37 @@ export default function QiblaScreen() {
             {/* Instructions */}
             <View style={styles.instructionsContainer}>
               <Text style={styles.instructionsTitle}>How to Use</Text>
-              <Text style={styles.instructionsText}>
-                • Hold your device flat and point it in the direction shown by the golden arrow
-              </Text>
-              <Text style={styles.instructionsText}>
-                • The arrow points toward the Kaaba in Mecca, Saudi Arabia
-              </Text>
-              <Text style={styles.instructionsText}>
-                • For best accuracy, calibrate your device&apos;s compass if needed
-              </Text>
+              {compassEnabled ? (
+                <>
+                  <Text style={styles.instructionsText}>
+                    • Hold your device flat in landscape orientation
+                  </Text>
+                  <Text style={styles.instructionsText}>
+                    • The golden arrow automatically points toward the Kaaba
+                  </Text>
+                  <Text style={styles.instructionsText}>
+                    • The compass rotates with your device movement
+                  </Text>
+                  <Text style={styles.instructionsText}>
+                    • Calibrate compass if the status shows &quot;Needs Calibration&quot;
+                  </Text>
+                  <Text style={styles.instructionsText}>
+                    • Keep away from metal objects for best accuracy
+                  </Text>
+                </>
+              ) : (
+                <>
+                  <Text style={styles.instructionsText}>
+                    • Point your device in the direction shown by the golden arrow
+                  </Text>
+                  <Text style={styles.instructionsText}>
+                    • The arrow shows the static direction to the Kaaba
+                  </Text>
+                  <Text style={styles.instructionsText}>
+                    • Enable &quot;Live&quot; mode for automatic compass tracking
+                  </Text>
+                </>
+              )}
             </View>
           </>
         )}
@@ -373,26 +567,33 @@ const styles = StyleSheet.create({
   },
   compassContainer: {
     alignItems: 'center',
-    marginVertical: 30,
+    marginVertical: 20,
   },
   compassOuter: {
-    width: width * 0.7,
-    height: width * 0.7,
-    maxWidth: 280,
-    maxHeight: 280,
-    borderRadius: (width * 0.7) / 2,
+    width: width * 0.8,
+    height: width * 0.8,
+    maxWidth: 320,
+    maxHeight: 320,
+    borderRadius: (width * 0.8) / 2,
     overflow: 'hidden',
-    elevation: 8,
+    elevation: 12,
     shadowColor: Colors.text,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
   },
   compassGradient: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     position: 'relative',
+  },
+  compassRing: {
+    position: 'absolute',
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   compassMark: {
     position: 'absolute',
@@ -403,63 +604,148 @@ const styles = StyleSheet.create({
     marginLeft: -1,
   },
   mark: {
+    width: 1,
+    height: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.4)',
+  },
+  mediumMark: {
     width: 2,
-    height: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.6)',
+    height: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.7)',
   },
   majorMark: {
-    height: 30,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    width: 3,
+    height: 25,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
   },
   directionLabel: {
     position: 'absolute',
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 'bold',
     color: Colors.textOnPrimary,
+    textShadowColor: 'rgba(0, 0, 0, 0.5)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 2,
+  },
+  degreeLabel: {
+    position: 'absolute',
+    fontSize: 12,
+    fontWeight: '600',
+    color: 'rgba(255, 255, 255, 0.8)',
   },
   northLabel: {
-    top: 15,
+    top: 20,
   },
   eastLabel: {
-    right: 15,
+    right: 20,
   },
   southLabel: {
-    bottom: 15,
+    bottom: 20,
   },
   westLabel: {
-    left: 15,
+    left: 20,
   },
   qiblaArrow: {
     position: 'absolute',
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
     justifyContent: 'center',
     alignItems: 'center',
-    elevation: 4,
-    shadowColor: Colors.text,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
+    elevation: 6,
+    shadowColor: '#D4AF37',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.4,
+    shadowRadius: 6,
   },
   arrowGradient: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  deviceIndicator: {
+    position: 'absolute',
+    top: 10,
+    width: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  deviceArrow: {
+    width: 0,
+    height: 0,
+    borderLeftWidth: 6,
+    borderRightWidth: 6,
+    borderBottomWidth: 12,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    borderBottomColor: '#FF4444',
   },
   centerDot: {
     position: 'absolute',
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
     backgroundColor: Colors.textOnPrimary,
+  },
+  calibrationStatus: {
+    position: 'absolute',
+    top: 15,
+    right: 15,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  calibrationDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: Colors.textOnPrimary,
+  },
+  compassControls: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 20,
+    marginTop: 15,
+  },
+  controlButton: {
+    alignItems: 'center',
+    padding: 10,
+    borderRadius: 8,
+    backgroundColor: Colors.surface,
+    minWidth: 80,
+  },
+  controlText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: Colors.primary,
+    marginTop: 4,
   },
   infoContainer: {
     flexDirection: 'row',
     gap: 12,
+    marginBottom: 15,
+  },
+  deviceInfoContainer: {
+    flexDirection: 'row',
+    gap: 12,
     marginBottom: 20,
+  },
+  deviceInfoCard: {
+    flex: 1,
+    borderRadius: 16,
+    overflow: 'hidden',
+    elevation: 4,
+    shadowColor: Colors.text,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
   infoCard: {
     flex: 1,

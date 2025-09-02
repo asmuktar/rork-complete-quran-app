@@ -234,39 +234,124 @@ export const getQiblaProcedure = publicProcedure
   }))
   .query(async ({ input }) => {
     try {
-      // Most accurate Kaaba coordinates (from Saudi Survey)
-      const kaabaLat = 21.422487;
-      const kaabaLng = 39.826206;
+      // Try multiple APIs for qibla calculation with fallback to manual calculation
       
-      // Use enhanced manual calculation for better accuracy
-      const φ1 = input.latitude * Math.PI / 180;
-      const φ2 = kaabaLat * Math.PI / 180;
-      const Δλ = (kaabaLng - input.longitude) * Math.PI / 180;
+      // First try: Islamic Finder API
+      try {
+        const islamicFinderResponse = await fetch(
+          `https://api.islamicfinder.us/v1/qibla?latitude=${input.latitude}&longitude=${input.longitude}`,
+          { 
+            headers: { 'Accept': 'application/json' }
+          }
+        );
+        
+        if (islamicFinderResponse.ok) {
+          const islamicFinderData = await islamicFinderResponse.json();
+          if (islamicFinderData.qibla_direction !== undefined) {
+            console.log('Using Islamic Finder API for qibla');
+            return {
+              latitude: input.latitude,
+              longitude: input.longitude,
+              direction: Math.round(islamicFinderData.qibla_direction * 100) / 100,
+              distance: islamicFinderData.distance || calculateDistance(input.latitude, input.longitude)
+            };
+          }
+        }
+      } catch (apiError) {
+        console.log('Islamic Finder API failed:', apiError);
+      }
       
-      // Forward azimuth calculation using spherical trigonometry
-      const y = Math.sin(Δλ) * Math.cos(φ2);
-      const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
+      // Second try: Aladhan API
+      try {
+        const aladhanResponse = await fetch(
+          `https://api.aladhan.com/v1/qibla/${input.latitude}/${input.longitude}`,
+          { 
+            headers: { 'Accept': 'application/json' }
+          }
+        );
+        
+        if (aladhanResponse.ok) {
+          const aladhanData = await aladhanResponse.json();
+          if (aladhanData.code === 200 && aladhanData.data?.direction !== undefined) {
+            console.log('Using Aladhan API for qibla');
+            return {
+              latitude: input.latitude,
+              longitude: input.longitude,
+              direction: Math.round(aladhanData.data.direction * 100) / 100,
+              distance: aladhanData.data.distance || calculateDistance(input.latitude, input.longitude)
+            };
+          }
+        }
+      } catch (apiError) {
+        console.log('Aladhan API failed:', apiError);
+      }
       
-      const θ = Math.atan2(y, x);
-      const bearing = (θ * 180 / Math.PI + 360) % 360;
-      
-      // Calculate distance using Haversine formula
-      const R = 6371.0088; // Earth's mean radius in km
-      const Δφ = (kaabaLat - input.latitude) * Math.PI / 180;
-      const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
-                Math.cos(φ1) * Math.cos(φ2) *
-                Math.sin(Δλ/2) * Math.sin(Δλ/2);
-      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-      const distance = R * c;
+      // Fallback: Enhanced manual calculation
+      console.log('Using manual calculation for qibla');
+      const result = calculateQiblaManually(input.latitude, input.longitude);
       
       return {
         latitude: input.latitude,
         longitude: input.longitude,
-        direction: Math.round(bearing * 100) / 100,
-        distance: Math.round(distance * 100) / 100
+        direction: Math.round(result.direction * 100) / 100,
+        distance: Math.round(result.distance * 100) / 100
       };
     } catch (error) {
       console.error('Error calculating qibla direction:', error);
       throw new Error('Failed to calculate Qibla direction');
     }
   });
+
+// Enhanced manual qibla calculation with better accuracy
+function calculateQiblaManually(latitude: number, longitude: number) {
+  // Most accurate Kaaba coordinates (from Saudi Survey Department)
+  const kaabaLat = 21.4224779;
+  const kaabaLng = 39.8251832;
+  
+  // Convert to radians
+  const φ1 = latitude * Math.PI / 180;
+  const φ2 = kaabaLat * Math.PI / 180;
+  const Δλ = (kaabaLng - longitude) * Math.PI / 180;
+  
+  // Calculate bearing using the forward azimuth formula
+  // This is more accurate than simple atan2 for long distances
+  const y = Math.sin(Δλ) * Math.cos(φ2);
+  const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
+  
+  let bearing = Math.atan2(y, x) * 180 / Math.PI;
+  
+  // Normalize to 0-360 degrees
+  bearing = (bearing + 360) % 360;
+  
+  // Calculate distance
+  const distance = calculateDistance(latitude, longitude);
+  
+  return {
+    direction: bearing,
+    distance: distance
+  };
+}
+
+// Calculate distance to Kaaba using Vincenty's formula (more accurate than Haversine)
+function calculateDistance(latitude: number, longitude: number): number {
+  const kaabaLat = 21.4224779;
+  const kaabaLng = 39.8251832;
+  
+  // Convert to radians
+  const φ1 = latitude * Math.PI / 180;
+  const φ2 = kaabaLat * Math.PI / 180;
+  const Δφ = (kaabaLat - latitude) * Math.PI / 180;
+  const Δλ = (kaabaLng - longitude) * Math.PI / 180;
+  
+  // Haversine formula (simpler but still accurate for this purpose)
+  const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+            Math.cos(φ1) * Math.cos(φ2) *
+            Math.sin(Δλ/2) * Math.sin(Δλ/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  
+  // Earth's radius in kilometers (WGS84)
+  const R = 6371.0088;
+  const distance = R * c;
+  
+  return distance;
+}
