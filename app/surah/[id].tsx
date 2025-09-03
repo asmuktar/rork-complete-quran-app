@@ -31,6 +31,7 @@ function SurahScreenContent() {
   const [showReciterSelection, setShowReciterSelection] = useState(false);
   const [showTestModal, setShowTestModal] = useState(false);
   const [showHafizMode, setShowHafizMode] = useState(false);
+  const [showTransliteration, setShowTransliteration] = useState(false);
   const [isOnline, setIsOnline] = useState(true);
   
   const audioPlayer = useAudioPlayer();
@@ -53,32 +54,39 @@ function SurahScreenContent() {
   const bookmarkedAyahs = React.useMemo(() => {
     return new Set(
       bookmarks
-        .filter(b => b.type === 'ayah' && b.surahNumber === surahId)
-        .map(b => b.ayahNumber!)
+        .filter(b => b.type === 'ayah' && (b as any).surahId === surahId)
+        .map(b => (b as any).ayahNumber)
     );
   }, [bookmarks, surahId]);
   
   const handleBookmarkAyah = async (ayahNumber: number) => {
     const ayah = surah?.verses.find(v => v.number === ayahNumber);
-    if (!ayah) return;
+    if (!ayah || !surah) return;
     
     const bookmarkId = `ayah-${surahId}-${ayahNumber}`;
     const isBookmarked = bookmarkedAyahs.has(ayahNumber);
     
     if (isBookmarked) {
-      await removeBookmark(bookmarkId);
+      // Find the actual bookmark to remove
+      const existingBookmark = bookmarks.find(b => 
+        b.type === 'ayah' && 
+        (b as any).surahId === surahId && 
+        (b as any).ayahNumber === ayahNumber
+      );
+      if (existingBookmark) {
+        await removeBookmark(existingBookmark.id);
+      }
     } else {
       await addBookmark({
-        id: bookmarkId,
         type: 'ayah',
-        title: `Surah ${surah.englishName} - Ayah ${ayahNumber}`,
-        surahNumber: surahId,
-        ayahNumber,
+        surahId: surahId,
         surahName: surah.englishName,
-        arabicText: ayah.text,
+        surahArabicName: surah.arabicName,
+        ayahNumber,
+        ayahText: ayah.text,
         translation: ayah.translation,
-        createdAt: Date.now()
-      });
+        tags: []
+      } as any);
     }
   };
   
@@ -127,14 +135,8 @@ function SurahScreenContent() {
     }
   };
   
-  const toggleBookmark = (ayahNumber: number) => {
-    const newBookmarks = new Set(bookmarkedAyahs);
-    if (newBookmarks.has(ayahNumber)) {
-      newBookmarks.delete(ayahNumber);
-    } else {
-      newBookmarks.add(ayahNumber);
-    }
-    setBookmarkedAyahs(newBookmarks);
+  const toggleBookmark = async (ayahNumber: number) => {
+    await handleBookmarkAyah(ayahNumber);
   };
   
   const currentReciter = TOP_RECITERS.find(r => r.id === selectedReciter);

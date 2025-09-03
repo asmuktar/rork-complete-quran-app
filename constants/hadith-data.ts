@@ -384,6 +384,140 @@ export const HADITH_DATABASE: Hadith[] = [
     chapter: 'The virtue of mercy',
     collection: 'ahmad',
     keywords: ['mercy', 'merciful', 'rahman', 'compassion', 'kindness', 'heaven']
+  },
+  
+  // Additional Bukhari hadiths to fill gaps
+  {
+    id: 23,
+    number: 2,
+    arab: 'بُنِيَ الإِسْلاَمُ عَلَى خَمْسٍ شَهَادَةِ أَنْ لاَ إِلَهَ إِلاَّ اللَّهُ وَأَنَّ مُحَمَّدًا رَسُولُ اللَّهِ وَإِقَامِ الصَّلاَةِ وَإِيتَاءِ الزَّكَاةِ وَالْحَجِّ وَصَوْمِ رَمَضَانَ',
+    translation: 'Islam is built upon five: the testimony that there is no god but Allah and that Muhammad is the Messenger of Allah, establishing prayer, giving Zakat, Hajj, and fasting Ramadan.',
+    narrator: 'Abdullah ibn Umar (RA)',
+    grade: 'Sahih',
+    book: 'Book of Faith',
+    chapter: 'The pillars of Islam',
+    collection: 'bukhari',
+    keywords: ['islam', 'pillars', 'shahada', 'prayer', 'zakat', 'hajj', 'fasting', 'ramadan']
+  },
+  {
+    id: 24,
+    number: 3,
+    arab: 'الإِيمَانُ بِضْعٌ وَسَبْعُونَ شُعْبَةً فَأَفْضَلُهَا قَوْلُ لاَ إِلَهَ إِلاَّ اللَّهُ وَأَدْنَاهَا إِمَاطَةُ الأَذَى عَنِ الطَّرِيقِ وَالْحَيَاءُ شُعْبَةٌ مِنَ الإِيمَانِ',
+    translation: 'Faith has seventy-odd branches, the best of which is saying La ilaha illa Allah (there is no god but Allah), and the least of which is removing harmful things from the road. And modesty is a branch of faith.',
+    narrator: 'Abu Hurairah (RA)',
+    grade: 'Sahih',
+    book: 'Book of Faith',
+    chapter: 'The branches of faith',
+    collection: 'bukhari',
+    keywords: ['faith', 'branches', 'la ilaha illa allah', 'modesty', 'road', 'harm']
+  },
+  {
+    id: 25,
+    number: 4,
+    arab: 'مَنْ كَذَبَ عَلَيَّ مُتَعَمِّدًا فَلْيَتَبَوَّأْ مَقْعَدَهُ مِنَ النَّارِ',
+    translation: 'Whoever lies about me deliberately, let him take his place in the Fire.',
+    narrator: 'Ali ibn Abi Talib (RA)',
+    grade: 'Sahih',
+    book: 'Book of Knowledge',
+    chapter: 'The sin of lying about the Prophet',
+    collection: 'bukhari',
+    keywords: ['lie', 'deliberately', 'fire', 'hell', 'prophet', 'false']
+  },
+  {
+    id: 26,
+    number: 5,
+    arab: 'مَنْ أَحْدَثَ فِي أَمْرِنَا هَذَا مَا لَيْسَ فِيهِ فَهُوَ رَدٌّ',
+    translation: 'Whoever introduces something into this matter of ours (Islam) that is not part of it, it will be rejected.',
+    narrator: 'Aisha (RA)',
+    grade: 'Sahih',
+    book: 'Book of Judgments',
+    chapter: 'Innovation in religion',
+    collection: 'bukhari',
+    keywords: ['innovation', 'bidah', 'rejected', 'islam', 'introduce', 'matter']
+  },
+  {
+    id: 27,
+    number: 6,
+    arab: 'الدِّينُ النَّصِيحَةُ قُلْنَا لِمَنْ قَالَ لِلَّهِ وَلِكِتَابِهِ وَلِرَسُولِهِ وَلأَئِمَّةِ الْمُسْلِمِينَ وَعَامَّتِهِمْ',
+    translation: 'Religion is sincere advice. We asked: To whom? He said: To Allah, His Book, His Messenger, the leaders of the Muslims and their common people.',
+    narrator: 'Tamim ad-Dari (RA)',
+    grade: 'Sahih',
+    book: 'Book of Faith',
+    chapter: 'Religion is sincere advice',
+    collection: 'bukhari',
+    keywords: ['religion', 'advice', 'sincere', 'allah', 'book', 'messenger', 'leaders']
+  },
+  {
+    id: 28,
+    number: 7,
+    arab: 'مَا نَهَيْتُكُمْ عَنْهُ فَاجْتَنِبُوهُ وَمَا أَمَرْتُكُمْ بِهِ فَافْعَلُوا مِنْهُ مَا اسْتَطَعْتُمْ',
+    translation: 'What I have forbidden you, avoid it. And what I have commanded you, do as much of it as you can.',
+    narrator: 'Abu Hurairah (RA)',
+    grade: 'Sahih',
+    book: 'Book of Holding Fast to the Quran and Sunnah',
+    chapter: 'Following the Prophet\'s commands',
+    collection: 'bukhari',
+    keywords: ['forbidden', 'avoid', 'command', 'ability', 'capacity', 'obedience']
+  },
+  {
+    id: 29,
+    number: 8,
+    arab: 'أُمِرْتُ أَنْ أُقَاتِلَ النَّاسَ حَتَّى يَشْهَدُوا أَنْ لاَ إِلَهَ إِلاَّ اللَّهُ وَأَنَّ مُحَمَّدًا رَسُولُ اللَّهِ',
+    translation: 'I have been commanded to fight people until they testify that there is no god but Allah and that Muhammad is the Messenger of Allah.',
+    narrator: 'Abdullah ibn Umar (RA)',
+    grade: 'Sahih',
+    book: 'Book of Faith',
+    chapter: 'The testimony of faith',
+    collection: 'bukhari',
+    keywords: ['fight', 'testify', 'shahada', 'muhammad', 'messenger', 'commanded']
+  },
+  {
+    id: 30,
+    number: 9,
+    arab: 'مَنْ قَالَ لاَ إِلَهَ إِلاَّ اللَّهُ وَكَفَرَ بِمَا يُعْبَدُ مِنْ دُونِ اللَّهِ حَرُمَ مَالُهُ وَدَمُهُ',
+    translation: 'Whoever says La ilaha illa Allah (there is no god but Allah) and disbelieves in what is worshipped besides Allah, his wealth and blood become sacred.',
+    narrator: 'Abu Malik (RA)',
+    grade: 'Sahih',
+    book: 'Book of Faith',
+    chapter: 'The protection of saying La ilaha illa Allah',
+    collection: 'bukhari',
+    keywords: ['la ilaha illa allah', 'disbelieve', 'worship', 'sacred', 'wealth', 'blood']
+  },
+  {
+    id: 31,
+    number: 10,
+    arab: 'خَيْرُ النَّاسِ قَرْنِي ثُمَّ الَّذِينَ يَلُونَهُمْ ثُمَّ الَّذِينَ يَلُونَهُمْ',
+    translation: 'The best of people are my generation, then those who come after them, then those who come after them.',
+    narrator: 'Abdullah ibn Masud (RA)',
+    grade: 'Sahih',
+    book: 'Book of Witnesses',
+    chapter: 'The best generations',
+    collection: 'bukhari',
+    keywords: ['best', 'people', 'generation', 'companions', 'followers', 'time']
+  },
+  {
+    id: 32,
+    number: 11,
+    arab: 'لاَ يُؤْمِنُ أَحَدُكُمْ حَتَّى أَكُونَ أَحَبَّ إِلَيْهِ مِنْ وَالِدِهِ وَوَلَدِهِ وَالنَّاسِ أَجْمَعِينَ',
+    translation: 'None of you believes until I am more beloved to him than his father, his child, and all people.',
+    narrator: 'Anas ibn Malik (RA)',
+    grade: 'Sahih',
+    book: 'Book of Faith',
+    chapter: 'Love for the Prophet',
+    collection: 'bukhari',
+    keywords: ['believe', 'beloved', 'father', 'child', 'people', 'love', 'prophet']
+  },
+  {
+    id: 33,
+    number: 12,
+    arab: 'مِنْ حُسْنِ إِسْلاَمِ الْمَرْءِ تَرْكُهُ مَا لاَ يَعْنِيهِ',
+    translation: 'Part of the excellence of a person\'s Islam is leaving what does not concern him.',
+    narrator: 'Abu Hurairah (RA)',
+    grade: 'Hasan',
+    book: 'Book of Good Manners',
+    chapter: 'Minding one\'s own business',
+    collection: 'bukhari',
+    keywords: ['excellence', 'islam', 'leave', 'concern', 'business', 'mind']
   }
 ];
 
@@ -421,6 +555,10 @@ export const getCollectionById = (id: string): HadithCollection | undefined => {
 
 export const getHadithsByCollection = (collectionId: string, page: number = 1, limit: number = 20): { hadiths: Hadith[], hasMore: boolean, total: number } => {
   const collectionHadiths = HADITH_DATABASE.filter(hadith => hadith.collection === collectionId);
+  
+  // Sort by hadith number to ensure proper ordering
+  collectionHadiths.sort((a, b) => a.number - b.number);
+  
   const startIndex = (page - 1) * limit;
   const endIndex = startIndex + limit;
   
