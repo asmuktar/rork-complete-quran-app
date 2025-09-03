@@ -1,6 +1,10 @@
 import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Constants from 'expo-constants';
+
+// Check if we're in Expo Go
+const isExpoGo = Constants.appOwnership === 'expo';
 
 export interface NotificationSettings {
   prayerReminders: boolean;
@@ -69,8 +73,8 @@ class NotificationService {
       // Load settings first
       await this.loadSettings();
       
-      if (Platform.OS !== 'web') {
-        // Configure notification behavior
+      if (Platform.OS !== 'web' && !isExpoGo) {
+        // Configure notification behavior (only in development builds)
         Notifications.setNotificationHandler({
           handleNotification: async () => ({
             shouldShowAlert: true,
@@ -83,6 +87,8 @@ class NotificationService {
         
         // Request permissions
         await this.requestPermissions();
+      } else if (isExpoGo) {
+        console.log('Notifications limited in Expo Go - use development build for full functionality');
       } else {
         console.log('Notifications disabled on web platform');
       }
@@ -96,8 +102,8 @@ class NotificationService {
 
   async requestPermissions(): Promise<boolean> {
     try {
-      if (Platform.OS === 'web') {
-        console.log('Notifications not supported on web');
+      if (Platform.OS === 'web' || isExpoGo) {
+        console.log('Notifications not fully supported on web or Expo Go');
         return false;
       }
 
@@ -169,7 +175,12 @@ class NotificationService {
     maghrib: Date;
     isha: Date;
   }) {
-    if (!this.settings.prayerReminders || Platform.OS === 'web') return;
+    if (!this.settings.prayerReminders || Platform.OS === 'web' || isExpoGo) {
+      if (isExpoGo) {
+        console.log('Prayer notifications require development build - not available in Expo Go');
+      }
+      return;
+    }
 
     try {
       // Cancel existing prayer notifications
@@ -221,7 +232,12 @@ class NotificationService {
   }
 
   async scheduleStudyReminder() {
-    if (!this.settings.studyReminders || Platform.OS === 'web') return;
+    if (!this.settings.studyReminders || Platform.OS === 'web' || isExpoGo) {
+      if (isExpoGo) {
+        console.log('Study reminders require development build - not available in Expo Go');
+      }
+      return;
+    }
 
     try {
       // Cancel existing study reminders
@@ -266,7 +282,12 @@ class NotificationService {
   }
 
   async scheduleDailyVerseReminder() {
-    if (!this.settings.dailyVerseReminder || Platform.OS === 'web') return;
+    if (!this.settings.dailyVerseReminder || Platform.OS === 'web' || isExpoGo) {
+      if (isExpoGo) {
+        console.log('Daily verse reminders require development build - not available in Expo Go');
+      }
+      return;
+    }
 
     try {
       // Cancel existing daily verse reminders
@@ -311,7 +332,12 @@ class NotificationService {
   }
 
   async scheduleHafizReviewReminder(ayahsCount: number, nextReviewTime?: Date) {
-    if (Platform.OS === 'web') return;
+    if (Platform.OS === 'web' || isExpoGo) {
+      if (isExpoGo) {
+        console.log('Hafiz review reminders require development build - not available in Expo Go');
+      }
+      return;
+    }
 
     try {
       const reviewTime = nextReviewTime || new Date(Date.now() + 2 * 60 * 60 * 1000); // 2 hours from now
@@ -347,7 +373,12 @@ class NotificationService {
   }
 
   async scheduleBookmarkReminder(bookmarkTitle: string, reminderTime: Date) {
-    if (!this.settings.bookmarkReminders || Platform.OS === 'web') return;
+    if (!this.settings.bookmarkReminders || Platform.OS === 'web' || isExpoGo) {
+      if (isExpoGo) {
+        console.log('Bookmark reminders require development build - not available in Expo Go');
+      }
+      return;
+    }
 
     try {
       const notificationId = await Notifications.scheduleNotificationAsync({
@@ -381,8 +412,11 @@ class NotificationService {
   }
 
   async sendImmediateNotification(title: string, body: string, data?: any) {
-    if (Platform.OS === 'web') {
+    if (Platform.OS === 'web' || isExpoGo) {
       console.log(`Notification: ${title} - ${body}`);
+      if (isExpoGo) {
+        console.log('Immediate notifications require development build - not available in Expo Go');
+      }
       return;
     }
 
@@ -402,7 +436,7 @@ class NotificationService {
   }
 
   async cancelNotificationsByType(type: ScheduledNotification['type']) {
-    if (Platform.OS === 'web') return;
+    if (Platform.OS === 'web' || isExpoGo) return;
     
     try {
       const notificationsToCancel = this.scheduledNotifications.filter(n => n.type === type);
@@ -421,7 +455,7 @@ class NotificationService {
   }
 
   async cancelAllNotifications() {
-    if (Platform.OS === 'web') return;
+    if (Platform.OS === 'web' || isExpoGo) return;
     
     try {
       await Notifications.cancelAllScheduledNotificationsAsync();
@@ -474,13 +508,13 @@ class NotificationService {
 
   // Notification response handlers
   addNotificationResponseListener(handler: (response: Notifications.NotificationResponse) => void) {
-    if (Platform.OS === 'web') return;
+    if (Platform.OS === 'web' || isExpoGo) return;
     
     return Notifications.addNotificationResponseReceivedListener(handler);
   }
 
   addNotificationReceivedListener(handler: (notification: Notifications.Notification) => void) {
-    if (Platform.OS === 'web') return;
+    if (Platform.OS === 'web' || isExpoGo) return;
     
     return Notifications.addNotificationReceivedListener(handler);
   }
@@ -498,7 +532,7 @@ class NotificationService {
 
   // Badge management
   async setBadgeCount(count: number) {
-    if (Platform.OS === 'web') return;
+    if (Platform.OS === 'web' || isExpoGo) return;
     
     try {
       await Notifications.setBadgeCountAsync(count);
