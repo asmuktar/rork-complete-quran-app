@@ -109,6 +109,17 @@ export default function SearchScreen() {
 
         const surahInfo = SURAHS.find(s => s.id === surahNumber);
         const reciter = getReciterById(selectedReciter);
+        
+        // Ensure we have valid data before proceeding
+        if (!surahInfo) {
+          console.warn(`Surah not found for number: ${surahNumber}`);
+          return null;
+        }
+        
+        if (!reciter) {
+          console.warn(`Reciter not found for ID: ${selectedReciter}`);
+          return null;
+        }
       
         // Calculate advanced relevance score using multiple AI-like factors
         let relevanceScore = 0;

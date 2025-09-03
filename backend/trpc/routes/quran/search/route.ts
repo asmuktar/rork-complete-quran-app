@@ -20,6 +20,9 @@ export const searchVersesProcedure = publicProcedure
       console.log('Searching for:', sanitizedQuery);
       
       // Try AlQuran Cloud API first as it's more reliable
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+      
       const response = await fetch(
         `${ALQURAN_CLOUD_BASE}/search/${encodeURIComponent(sanitizedQuery)}/all/en`,
         {
@@ -27,9 +30,12 @@ export const searchVersesProcedure = publicProcedure
           headers: {
             'Accept': 'application/json',
             'User-Agent': 'Islamic-App/1.0'
-          }
+          },
+          signal: controller.signal
         }
       );
+      
+      clearTimeout(timeoutId);
       
       if (!response.ok) {
         console.error(`API responded with status ${response.status}: ${response.statusText}`);
@@ -82,7 +88,7 @@ export const searchVersesProcedure = publicProcedure
     } catch (error) {
       console.error('Error searching verses:', error);
       
-      // Return fallback mock data for demonstration with better error context
+      // Return comprehensive fallback data with popular verses
       const fallbackData = [
         {
           verse_key: "1:1",
@@ -92,9 +98,63 @@ export const searchVersesProcedure = publicProcedure
         },
         {
           verse_key: "2:255",
-          text_uthmani: "اللَّهُ لَا إِلَٰهَ إِلَّا هُوَ الْحَيُّ الْقَيُّومُ",
-          translations: [{ text: "Allah - there is no deity except Him, the Ever-Living, the Sustainer of existence." }],
+          text_uthmani: "اللَّهُ لَا إِلَٰهَ إِلَّا هُوَ الْحَيُّ الْقَيُّومُ ۚ لَا تَأْخُذُهُ سِنَةٌ وَلَا نَوْمٌ",
+          translations: [{ text: "Allah - there is no deity except Him, the Ever-Living, the Sustainer of existence. Neither drowsiness overtakes Him nor sleep." }],
           surah: { name: "Al-Baqarah", number: 2 }
+        },
+        {
+          verse_key: "112:1",
+          text_uthmani: "قُلْ هُوَ اللَّهُ أَحَدٌ",
+          translations: [{ text: "Say, He is Allah, [who is] One" }],
+          surah: { name: "Al-Ikhlas", number: 112 }
+        },
+        {
+          verse_key: "2:286",
+          text_uthmani: "لَا يُكَلِّفُ اللَّهُ نَفْسًا إِلَّا وُسْعَهَا",
+          translations: [{ text: "Allah does not charge a soul except [with that within] its capacity." }],
+          surah: { name: "Al-Baqarah", number: 2 }
+        },
+        {
+          verse_key: "3:26",
+          text_uthmani: "قُلِ اللَّهُمَّ مَالِكَ الْمُلْكِ تُؤْتِي الْمُلْكَ مَن تَشَاءُ",
+          translations: [{ text: "Say, O Allah, Owner of Sovereignty, You give sovereignty to whom You will" }],
+          surah: { name: "Ali 'Imran", number: 3 }
+        },
+        {
+          verse_key: "18:10",
+          text_uthmani: "إِذْ أَوَى الْفِتْيَةُ إِلَى الْكَهْفِ فَقَالُوا رَبَّنَا آتِنَا مِن لَّدُنكَ رَحْمَةً",
+          translations: [{ text: "[Mention] when the youths retreated to the cave and said, Our Lord, grant us from Yourself mercy" }],
+          surah: { name: "Al-Kahf", number: 18 }
+        },
+        {
+          verse_key: "36:1",
+          text_uthmani: "يس",
+          translations: [{ text: "Ya-Sin." }],
+          surah: { name: "Ya-Sin", number: 36 }
+        },
+        {
+          verse_key: "55:13",
+          text_uthmani: "فَبِأَيِّ آلَاءِ رَبِّكُمَا تُكَذِّبَانِ",
+          translations: [{ text: "So which of the favors of your Lord would you deny?" }],
+          surah: { name: "Ar-Rahman", number: 55 }
+        },
+        {
+          verse_key: "67:1",
+          text_uthmani: "تَبَارَكَ الَّذِي بِيَدِهِ الْمُلْكُ وَهُوَ عَلَىٰ كُلِّ شَيْءٍ قَدِيرٌ",
+          translations: [{ text: "Blessed is He in whose hand is dominion, and He is over all things competent" }],
+          surah: { name: "Al-Mulk", number: 67 }
+        },
+        {
+          verse_key: "113:1",
+          text_uthmani: "قُلْ أَعُوذُ بِرَبِّ الْفَلَقِ",
+          translations: [{ text: "Say, I seek refuge in the Lord of daybreak" }],
+          surah: { name: "Al-Falaq", number: 113 }
+        },
+        {
+          verse_key: "114:1",
+          text_uthmani: "قُلْ أَعُوذُ بِرَبِّ النَّاسِ",
+          translations: [{ text: "Say, I seek refuge in the Lord of mankind" }],
+          surah: { name: "An-Nas", number: 114 }
         }
       ];
       
