@@ -1,14 +1,15 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { View, Text, StyleSheet, TextInput, ScrollView, TouchableOpacity, Platform, Alert, Dimensions, Animated } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Search, Mic, MicOff, Volume2, BookOpen, User, Loader, Play, Pause, StopCircle, SkipForward } from 'lucide-react-native';
+import { Search, Mic, MicOff, Volume2, BookOpen, User, Loader, Play, Pause, StopCircle, SkipForward, Download, CheckCircle, Zap, Star, TrendingUp } from 'lucide-react-native';
 import { Colors } from '@/constants/colors';
 import { Audio } from 'expo-av';
 import { trpc } from '@/lib/trpc';
 import { SURAHS, searchSurahs } from '@/constants/quran-data';
 import { TOP_RECITERS, getReciterById } from '@/constants/reciters';
 import { useAudioPlayer } from '@/hooks/use-audio-player';
+import audioDownloadService from '@/services/audio-download-service';
 
 const { width } = Dimensions.get('window');
 
@@ -26,9 +27,15 @@ interface SearchResult {
   reciterId?: string;
   audioUrl?: string;
   relevanceScore?: number;
-  matchType?: 'exact' | 'partial' | 'phonetic' | 'semantic';
+  matchType?: 'exact' | 'partial' | 'phonetic' | 'semantic' | 'contextual';
   surahName?: string;
   verseKey?: string;
+  confidence?: number;
+  isDownloaded?: boolean;
+  downloadProgress?: number;
+  contextualMatches?: string[];
+  popularityBoost?: number;
+  recitationQuality?: 'high' | 'medium' | 'standard';
 }
 
 export default function SearchScreen() {
@@ -40,6 +47,10 @@ export default function SearchScreen() {
   const [recordingTime, setRecordingTime] = useState(0);
   const [isProcessing, setIsProcessing] = useState(false);
   const [selectedReciter, setSelectedReciter] = useState('mishary-alafasy');
+  const [downloadedReciters, setDownloadedReciters] = useState<string[]>([]);
+  const [downloadProgress, setDownloadProgress] = useState<Record<string, number>>({});
+  const [searchHistory, setSearchHistory] = useState<string[]>([]);
+  const [trendingSearches] = useState(['Bismillah', 'Ayat al-Kursi', 'Al-Fatihah', 'Surah Yasin', 'Dua', 'Paradise', 'Forgiveness']);
   
   const { 
     isPlaying, 
@@ -53,52 +64,29 @@ export default function SearchScreen() {
     setReciter
   } = useAudioPlayer();
   
-  const searchMutation = trpc.quran.searchVerses.useMutation({
-    onSuccess: (data) => {
-      const enhancedResults = enhanceSearchResults(data, searchQuery);
-      setSearchResults(enhancedResults);
-      setIsLoading(false);
-    },
-    onError: (error) => {
-      console.error('Search error:', error);
-      setIsLoading(false);
-      Alert.alert('Search Error', 'Failed to search verses. Please try again.');
-    },
-  });
-  
-  const voiceSearchMutation = trpc.quran.voiceSearch.useMutation({
-    onSuccess: (data) => {
-      const enhancedResults = enhanceSearchResults(data, searchQuery);
-      setSearchResults(enhancedResults);
-      setIsProcessing(false);
-      setHasSearched(true);
-    },
-    onError: (error) => {
-      console.error('Voice search error:', error);
-      setIsProcessing(false);
-      Alert.alert('Voice Search Error', 'Could not understand the audio. Please try again.');
-    },
-  });
-  
-  const recordingRef = useRef<Audio.Recording | null>(null);
-  const pulseAnim = useRef(new Animated.Value(1)).current;
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
-  const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
-  
-  // Enhanced search algorithm similar to Shazam
-  const enhanceSearchResults = useCallback((data: any[], query: string): SearchResult[] => {
-    const results: SearchResult[] = data.map((result: any) => {
+  // Advanced search algorithm similar to Shazam with AI-like ranking
+  const enhanceSearchResults = useCallback(async (data: any[], query: string): Promise<SearchResult[]> => {
+    const results: SearchResult[] = await Promise.all(data.map(async (result: any) => {
       const surahNumber = parseInt(result.verse_key.split(':')[0]);
       const ayahNumber = parseInt(result.verse_key.split(':')[1]);
       const surahInfo = SURAHS.find(s => s.id === surahNumber);
       const reciter = getReciterById(selectedReciter);
       
-      // Calculate relevance score using multiple factors
-      const relevanceScore = calculateRelevanceScore(result, query);
-      const matchType = determineMatchType(result, query);
+      // Calculate advanced relevance score using multiple AI-like factors
+      const relevanceScore = await calculateAdvancedRelevanceScore(result, query);
+      const matchType = determineAdvancedMatchType(result, query);
+      const confidence = calculateConfidenceScore(result, query);
+      const contextualMatches = findContextualMatches(result, query);
+      const popularityBoost = calculatePopularityBoost(result.verse_key);
+      
+      // Check if audio is downloaded locally
+      const isDownloaded = await audioDownloadService.isAudioAvailableLocally(selectedReciter, surahNumber, ayahNumber);
       
       // Generate audio URL for the specific ayah
       const audioUrl = getAyahAudioUrl(surahNumber, ayahNumber, selectedReciter);
+      
+      // Determine recitation quality based on reciter
+      const recitationQuality = getRecitationQuality(selectedReciter);
       
       return {
         id: `ayah-${result.verse_key}`,
@@ -116,86 +104,393 @@ export default function SearchScreen() {
         relevanceScore,
         matchType,
         verseKey: result.verse_key,
+        confidence,
+        isDownloaded,
+        contextualMatches,
+        popularityBoost,
+        recitationQuality,
       };
-    });
+    }));
     
-    // Sort by relevance score (Shazam-like ranking)
-    return results.sort((a, b) => (b.relevanceScore || 0) - (a.relevanceScore || 0));
+    // Advanced Shazam-like ranking algorithm
+    return results.sort((a, b) => {
+      // Primary sort by confidence and relevance
+      const scoreA = (a.relevanceScore || 0) + (a.confidence || 0) * 50 + (a.popularityBoost || 0);
+      const scoreB = (b.relevanceScore || 0) + (b.confidence || 0) * 50 + (b.popularityBoost || 0);
+      
+      if (Math.abs(scoreA - scoreB) > 10) {
+        return scoreB - scoreA;
+      }
+      
+      // Secondary sort by download availability (local first)
+      if (a.isDownloaded !== b.isDownloaded) {
+        return a.isDownloaded ? -1 : 1;
+      }
+      
+      // Tertiary sort by recitation quality
+      const qualityOrder = { 'high': 3, 'medium': 2, 'standard': 1 };
+      const qualityDiff = (qualityOrder[a.recitationQuality || 'standard'] || 1) - (qualityOrder[b.recitationQuality || 'standard'] || 1);
+      if (qualityDiff !== 0) {
+        return -qualityDiff;
+      }
+      
+      return scoreB - scoreA;
+    });
   }, [selectedReciter]);
-  
-  // Calculate relevance score based on multiple factors
-  const calculateRelevanceScore = (result: any, query: string): number => {
+
+  // Advanced AI-like relevance scoring with multiple sophisticated factors
+  const calculateAdvancedRelevanceScore = useCallback(async (result: any, query: string): Promise<number> => {
     let score = 0;
-    const queryLower = query.toLowerCase();
+    const queryLower = query.toLowerCase().trim();
     const arabicText = result.text_uthmani || '';
     const translation = result.translations?.[0]?.text?.toLowerCase() || '';
+    const verseKey = result.verse_key;
     
-    // Exact match in translation (highest score)
+    // 1. Exact phrase matching (Shazam-like precision)
     if (translation.includes(queryLower)) {
-      score += 100;
-      if (translation.startsWith(queryLower)) score += 50;
+      const position = translation.indexOf(queryLower);
+      score += 200; // Base exact match score
+      
+      // Boost for beginning of verse (more relevant)
+      if (position < 20) score += 100;
+      if (position === 0) score += 150;
+      
+      // Boost for complete word boundaries
+      const beforeChar = position > 0 ? translation[position - 1] : ' ';
+      const afterChar = position + queryLower.length < translation.length ? translation[position + queryLower.length] : ' ';
+      if (/\s/.test(beforeChar) && /\s/.test(afterChar)) {
+        score += 75; // Complete word match
+      }
     }
     
-    // Partial word matches
-    const queryWords = queryLower.split(' ');
-    const translationWords = translation.split(' ');
+    // 2. Advanced word-level analysis
+    const queryWords = queryLower.split(/\s+/).filter(w => w.length > 2);
+    const translationWords = translation.split(/\s+/);
     
-    queryWords.forEach(queryWord => {
-      translationWords.forEach((transWord: string) => {
-        if (transWord.includes(queryWord)) {
-          score += 20;
+    let wordMatchCount = 0;
+    let consecutiveMatches = 0;
+    let maxConsecutive = 0;
+    
+    queryWords.forEach((queryWord, qIndex) => {
+      let bestWordScore = 0;
+      let foundInSequence = false;
+      
+      translationWords.forEach((transWord: string, tIndex: number) => {
+        const cleanTransWord = transWord.replace(/[^a-zA-Z]/g, '').toLowerCase();
+        
+        // Exact word match
+        if (cleanTransWord === queryWord) {
+          bestWordScore = Math.max(bestWordScore, 60);
+          wordMatchCount++;
+          
+          // Check for consecutive word matches
+          if (qIndex > 0 && tIndex > 0) {
+            const prevQueryWord = queryWords[qIndex - 1];
+            const prevTransWord = translationWords[tIndex - 1].replace(/[^a-zA-Z]/g, '').toLowerCase();
+            if (prevTransWord === prevQueryWord) {
+              consecutiveMatches++;
+              foundInSequence = true;
+            }
+          }
         }
-        if (transWord === queryWord) {
-          score += 40;
+        // Partial word match (fuzzy matching)
+        else if (cleanTransWord.includes(queryWord) && queryWord.length > 3) {
+          bestWordScore = Math.max(bestWordScore, 30);
+        }
+        // Stem matching (basic)
+        else if (queryWord.length > 4 && cleanTransWord.startsWith(queryWord.substring(0, 4))) {
+          bestWordScore = Math.max(bestWordScore, 20);
+        }
+      });
+      
+      score += bestWordScore;
+      if (foundInSequence) {
+        maxConsecutive = Math.max(maxConsecutive, consecutiveMatches);
+      } else {
+        consecutiveMatches = 0;
+      }
+    });
+    
+    // Bonus for consecutive word matches (phrase integrity)
+    score += maxConsecutive * 40;
+    
+    // Word coverage bonus
+    const wordCoverage = wordMatchCount / Math.max(queryWords.length, 1);
+    score += wordCoverage * 80;
+    
+    // 3. Arabic text matching with enhanced scoring
+    if (arabicText.includes(query)) {
+      score += 300; // Arabic exact match is highly valuable
+      
+      // Bonus for Arabic query at word boundaries
+      const arabicWords = arabicText.split(/\s+/);
+      const queryInArabic = arabicWords.some((word: string) => word.includes(query));
+      if (queryInArabic) score += 100;
+    }
+    
+    // 4. Semantic similarity (simplified)
+    const semanticScore = calculateSemanticSimilarity(query, translation);
+    score += semanticScore;
+    
+    // 5. Verse popularity and importance
+    const popularityScore = calculatePopularityBoost(verseKey);
+    score += popularityScore;
+    
+    // 6. Query length consideration (longer queries should be more precise)
+    const queryComplexity = Math.min(queryWords.length * 10, 50);
+    score += queryComplexity;
+    
+    // 7. Recency bias for search history
+    if (searchHistory.includes(queryLower)) {
+      score += 25; // Slight boost for previously searched terms
+    }
+    
+    return Math.round(score);
+  }, [searchHistory]);
+  
+  // Enhanced semantic similarity calculation
+  const calculateSemanticSimilarity = useCallback((query: string, translation: string): number => {
+    const semanticGroups = {
+      divine: {
+        keywords: ['god', 'allah', 'lord', 'creator', 'almighty', 'divine', 'deity'],
+        arabicKeywords: ['الله', 'رب', 'إله'],
+        score: 40
+      },
+      worship: {
+        keywords: ['prayer', 'salah', 'worship', 'pray', 'prostrate', 'bow', 'kneel'],
+        arabicKeywords: ['صلاة', 'عبادة', 'سجود'],
+        score: 35
+      },
+      mercy: {
+        keywords: ['mercy', 'merciful', 'compassion', 'forgiveness', 'kind', 'gentle'],
+        arabicKeywords: ['رحمة', 'رحيم', 'غفور'],
+        score: 35
+      },
+      paradise: {
+        keywords: ['paradise', 'heaven', 'jannah', 'garden', 'eternal', 'bliss'],
+        arabicKeywords: ['جنة', 'فردوس'],
+        score: 30
+      },
+      guidance: {
+        keywords: ['guidance', 'guide', 'path', 'way', 'direction', 'light'],
+        arabicKeywords: ['هداية', 'صراط', 'نور'],
+        score: 30
+      },
+      knowledge: {
+        keywords: ['knowledge', 'wisdom', 'learn', 'teach', 'understand', 'know'],
+        arabicKeywords: ['علم', 'حكمة', 'فهم'],
+        score: 25
+      }
+    };
+    
+    let semanticScore = 0;
+    const queryLower = query.toLowerCase();
+    const translationLower = translation.toLowerCase();
+    
+    Object.values(semanticGroups).forEach(group => {
+      const queryHasKeyword = group.keywords.some(keyword => queryLower.includes(keyword));
+      const translationHasKeyword = group.keywords.some(keyword => translationLower.includes(keyword));
+      
+      if (queryHasKeyword && translationHasKeyword) {
+        semanticScore += group.score;
+      }
+    });
+    
+    return semanticScore;
+  }, []);
+  
+  // Calculate confidence score (0-1) based on match quality
+  const calculateConfidenceScore = useCallback((result: any, query: string): number => {
+    const translation = result.translations?.[0]?.text?.toLowerCase() || '';
+    const queryLower = query.toLowerCase();
+    
+    // Exact match = high confidence
+    if (translation.includes(queryLower)) {
+      const matchLength = queryLower.length;
+      const translationLength = translation.length;
+      return Math.min(0.95, 0.6 + (matchLength / translationLength) * 0.35);
+    }
+    
+    // Word-based confidence
+    const queryWords = queryLower.split(/\s+/).filter(w => w.length > 2);
+    const translationWords = translation.split(/\s+/);
+    
+    let matchingWords = 0;
+    queryWords.forEach((qWord: string) => {
+      if (translationWords.some((tWord: string) => tWord.includes(qWord))) {
+        matchingWords++;
+      }
+    });
+    
+    const wordMatchRatio = matchingWords / Math.max(queryWords.length, 1);
+    return Math.min(0.85, wordMatchRatio * 0.7);
+  }, []);
+  
+  // Find contextual matches for better user understanding
+  const findContextualMatches = useCallback((result: any, query: string): string[] => {
+    const translation = result.translations?.[0]?.text || '';
+    const queryLower = query.toLowerCase();
+    const matches: string[] = [];
+    
+    // Find sentences or phrases that contain the query
+    const sentences = translation.split(/[.!?]+/);
+    sentences.forEach((sentence: string) => {
+      if (sentence.toLowerCase().includes(queryLower)) {
+        const trimmed = sentence.trim();
+        if (trimmed.length > 10 && trimmed.length < 100) {
+          matches.push(trimmed);
+        }
+      }
+    });
+    
+    return matches.slice(0, 2); // Limit to 2 contextual matches
+  }, []);
+
+  // Advanced match type determination with contextual analysis
+  const determineAdvancedMatchType = useCallback((result: any, query: string): 'exact' | 'partial' | 'phonetic' | 'semantic' | 'contextual' => {
+    const translation = result.translations?.[0]?.text?.toLowerCase() || '';
+    const queryLower = query.toLowerCase();
+    const arabicText = result.text_uthmani || '';
+    
+    // Exact match in Arabic (highest priority)
+    if (arabicText.includes(query)) {
+      return 'exact';
+    }
+    
+    // Exact phrase match in translation
+    if (translation.includes(queryLower)) {
+      const position = translation.indexOf(queryLower);
+      // Check if it's at word boundaries for true exact match
+      const beforeChar = position > 0 ? translation[position - 1] : ' ';
+      const afterChar = position + queryLower.length < translation.length ? translation[position + queryLower.length] : ' ';
+      
+      if (/\s/.test(beforeChar) && /\s/.test(afterChar)) {
+        return 'exact';
+      }
+      return 'partial';
+    }
+    
+    // Check for word-level matches
+    const queryWords = queryLower.split(/\s+/).filter(w => w.length > 2);
+    const translationWords = translation.split(/\s+/);
+    
+    let exactWordMatches = 0;
+    let partialWordMatches = 0;
+    
+    queryWords.forEach((qWord: string) => {
+      translationWords.forEach((tWord: string) => {
+        const cleanTWord = tWord.replace(/[^a-zA-Z]/g, '').toLowerCase();
+        if (cleanTWord === qWord) {
+          exactWordMatches++;
+        } else if (cleanTWord.includes(qWord) && qWord.length > 3) {
+          partialWordMatches++;
         }
       });
     });
     
-    // Arabic text matching (for Arabic queries)
-    if (arabicText.includes(query)) {
-      score += 150;
+    // If most words match exactly
+    if (exactWordMatches >= queryWords.length * 0.7) {
+      return 'partial';
     }
     
-    // Boost popular verses
-    const verseKey = result.verse_key;
-    const popularVerses = ['1:1', '2:255', '112:1', '113:1', '114:1', '36:1', '67:1'];
-    if (popularVerses.includes(verseKey)) {
-      score += 30;
+    // Check for semantic similarity
+    const semanticScore = calculateSemanticSimilarity(query, translation);
+    if (semanticScore > 25) {
+      return 'semantic';
     }
     
-    return score;
-  };
+    // Check for contextual relevance
+    const contextualMatches = findContextualMatches(result, query);
+    if (contextualMatches.length > 0) {
+      return 'contextual';
+    }
+    
+    // Default to phonetic for any remaining matches
+    return 'phonetic';
+  }, [calculateSemanticSimilarity, findContextualMatches]);
   
-  // Determine match type for better UX
-  const determineMatchType = (result: any, query: string): 'exact' | 'partial' | 'phonetic' | 'semantic' => {
-    const translation = result.translations?.[0]?.text?.toLowerCase() || '';
-    const queryLower = query.toLowerCase();
-    
-    if (translation.includes(queryLower)) {
-      return translation.indexOf(queryLower) === 0 ? 'exact' : 'partial';
-    }
-    
-    if (result.text_uthmani?.includes(query)) {
-      return 'exact';
-    }
-    
-    // Check for semantic similarity (simplified)
-    const semanticKeywords = {
-      'god': ['allah', 'lord', 'creator'],
-      'prayer': ['salah', 'worship', 'pray'],
-      'mercy': ['merciful', 'compassion', 'forgiveness'],
-      'paradise': ['heaven', 'jannah', 'garden'],
-      'hell': ['fire', 'punishment', 'jahannam']
+  // Calculate popularity boost based on verse importance
+  const calculatePopularityBoost = useCallback((verseKey: string): number => {
+    const popularVerses = {
+      '1:1': 100,   // Bismillah
+      '1:2': 80,    // Al-Fatihah
+      '1:7': 70,    // Al-Fatihah ending
+      '2:255': 95,  // Ayat al-Kursi
+      '2:286': 85,  // Last verse of Al-Baqarah
+      '3:26': 75,   // Dua verse
+      '18:10': 70,  // Cave companions
+      '36:1': 80,   // Ya-Sin
+      '55:13': 75,  // Ar-Rahman refrain
+      '67:1': 70,   // Al-Mulk opening
+      '112:1': 90,  // Al-Ikhlas
+      '112:2': 85,  // Al-Ikhlas
+      '112:3': 85,  // Al-Ikhlas
+      '112:4': 85,  // Al-Ikhlas
+      '113:1': 80,  // Al-Falaq
+      '114:1': 80,  // An-Nas
     };
     
-    for (const [key, synonyms] of Object.entries(semanticKeywords)) {
-      if (queryLower.includes(key) && synonyms.some(syn => translation.includes(syn))) {
-        return 'semantic';
-      }
-    }
+    return (popularVerses as Record<string, number>)[verseKey] || 0;
+  }, []);
+  
+  // Determine recitation quality based on reciter
+  const getRecitationQuality = useCallback((reciterId: string): 'high' | 'medium' | 'standard' => {
+    const highQualityReciters = [
+      'mishary-alafasy', 'abdur-rahman-sudais', 'maher-al-muaiqly',
+      'abdullah-basfar', 'mohamed-siddiq-al-minshawi', 'bandar-baleela'
+    ];
     
-    return 'phonetic';
-  };
+    const mediumQualityReciters = [
+      'saad-al-ghamdi', 'ali-al-hudhaify', 'abu-bakr-al-shatri',
+      'ahmad-al-ajmi', 'mohamed-al-tablawi', 'salah-al-budair'
+    ];
+    
+    if (highQualityReciters.includes(reciterId)) return 'high';
+    if (mediumQualityReciters.includes(reciterId)) return 'medium';
+    return 'standard';
+  }, []);
+  
+  const searchMutation = trpc.quran.searchVerses.useMutation({
+    onSuccess: async (data) => {
+      const enhancedResults = await enhanceSearchResults(data, searchQuery);
+      setSearchResults(enhancedResults);
+      setIsLoading(false);
+      
+      // Add to search history
+      if (searchQuery.trim() && !searchHistory.includes(searchQuery.toLowerCase())) {
+        setSearchHistory(prev => [searchQuery.toLowerCase(), ...prev.slice(0, 9)]); // Keep last 10 searches
+      }
+    },
+    onError: (error) => {
+      console.error('Search error:', error);
+      setIsLoading(false);
+      Alert.alert('Search Error', 'Failed to search verses. Please try again.');
+    },
+  });
+  
+  const voiceSearchMutation = trpc.quran.voiceSearch.useMutation({
+    onSuccess: async (data) => {
+      const enhancedResults = await enhanceSearchResults(data, searchQuery);
+      setSearchResults(enhancedResults);
+      setIsProcessing(false);
+      setHasSearched(true);
+      
+      // Add to search history
+      if (searchQuery.trim() && !searchHistory.includes(searchQuery.toLowerCase())) {
+        setSearchHistory(prev => [searchQuery.toLowerCase(), ...prev.slice(0, 9)]);
+      }
+    },
+    onError: (error) => {
+      console.error('Voice search error:', error);
+      setIsProcessing(false);
+      Alert.alert('Voice Search Error', 'Could not understand the audio. Please try again.');
+    },
+  });
+  
+  const recordingRef = useRef<Audio.Recording | null>(null);
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
   
   // Generate audio URL for specific ayah
   const getAyahAudioUrl = (surahNumber: number, ayahNumber: number, reciterId: string): string => {
@@ -448,6 +743,54 @@ export default function SearchScreen() {
     }
   }, [stopPlayback]);
 
+  // Initialize downloaded reciters and progress tracking
+  useEffect(() => {
+    const initializeDownloadData = async () => {
+      try {
+        const downloadedRecitersList = await audioDownloadService.getDownloadedReciters();
+        setDownloadedReciters(downloadedRecitersList.map(r => r.reciterId));
+        
+        // Initialize default reciters if not already done
+        await audioDownloadService.initializeDefaultReciters();
+      } catch (error) {
+        console.error('Error initializing download data:', error);
+      }
+    };
+    
+    initializeDownloadData();
+    
+    // Set up download progress listener
+    const progressListener = (progress: any) => {
+      setDownloadProgress(prev => ({
+        ...prev,
+        [`${progress.reciterId}-${progress.surahId}`]: progress.progress
+      }));
+    };
+    
+    audioDownloadService.addProgressListener(progressListener);
+    
+    return () => {
+      audioDownloadService.removeProgressListener(progressListener);
+    };
+  }, []);
+  
+  // Update reciter when selection changes
+  useEffect(() => {
+    setReciter(selectedReciter);
+  }, [selectedReciter, setReciter]);
+  
+  // Memoized reciter availability check
+  const reciterAvailability = useMemo(() => {
+    return TOP_RECITERS.reduce((acc, reciter) => {
+      acc[reciter.id] = {
+        isDefault: audioDownloadService.isDefaultReciter(reciter.id),
+        isDownloaded: downloadedReciters.includes(reciter.id),
+        quality: getRecitationQuality(reciter.id)
+      };
+      return acc;
+    }, {} as Record<string, { isDefault: boolean; isDownloaded: boolean; quality: 'high' | 'medium' | 'standard' }>);
+  }, [downloadedReciters, getRecitationQuality]);
+
   const renderSearchResult = (result: SearchResult) => {
     const getIcon = () => {
       switch (result.type) {
@@ -466,14 +809,43 @@ export default function SearchScreen() {
       const baseLabel = result.type === 'ayah' ? 'Ayah' : result.type === 'surah' ? 'Surah' : 'Reciter';
       if (result.matchType) {
         const matchLabels = {
-          exact: '🎯 Exact',
-          partial: '📝 Partial',
+          exact: '🎯 Exact Match',
+          partial: '📝 Partial Match',
           phonetic: '🔊 Phonetic',
-          semantic: '🧠 Semantic'
+          semantic: '🧠 Semantic',
+          contextual: '🔗 Contextual'
         };
         return `${baseLabel} • ${matchLabels[result.matchType]}`;
       }
       return baseLabel;
+    };
+    
+    const getConfidenceIndicator = () => {
+      if (!result.confidence) return null;
+      
+      const confidence = result.confidence;
+      if (confidence > 0.8) return <Star size={12} color={Colors.success} />;
+      if (confidence > 0.6) return <TrendingUp size={12} color={Colors.warning} />;
+      return <Zap size={12} color={Colors.textLight} />;
+    };
+    
+    const getDownloadStatus = () => {
+      if (result.isDownloaded) {
+        return <CheckCircle size={14} color={Colors.success} />;
+      }
+      
+      const progressKey = `${result.reciterId}-${result.surahNumber}`;
+      const progress = downloadProgress[progressKey];
+      
+      if (progress && progress > 0 && progress < 1) {
+        return (
+          <View style={styles.downloadProgress}>
+            <Text style={styles.downloadProgressText}>{Math.round(progress * 100)}%</Text>
+          </View>
+        );
+      }
+      
+      return <Download size={14} color={Colors.textLight} />;
     };
     
     const getRelevanceColor = () => {
@@ -498,20 +870,36 @@ export default function SearchScreen() {
           <View style={styles.resultContent}>
             <View style={styles.resultTitleRow}>
               <Text style={styles.resultTitle} numberOfLines={1}>{result.title}</Text>
-              <View style={[styles.typeLabel, { borderColor: getRelevanceColor() }]}>
-                <Text style={[styles.typeLabelText, { color: getRelevanceColor() }]}>
-                  {getTypeLabel()}
-                </Text>
+              <View style={styles.resultBadges}>
+                <View style={[styles.typeLabel, { borderColor: getRelevanceColor() }]}>
+                  <Text style={[styles.typeLabelText, { color: getRelevanceColor() }]}>
+                    {getTypeLabel()}
+                  </Text>
+                </View>
+                {getConfidenceIndicator()}
               </View>
             </View>
             {result.subtitle && (
               <Text style={styles.resultSubtitle} numberOfLines={1}>{result.subtitle}</Text>
             )}
-            {result.relevanceScore && result.relevanceScore > 0 && (
-              <Text style={[styles.relevanceScore, { color: getRelevanceColor() }]}>
-                Relevance: {Math.round(result.relevanceScore)}%
-              </Text>
-            )}
+            <View style={styles.resultMetrics}>
+              {result.relevanceScore && result.relevanceScore > 0 && (
+                <Text style={[styles.relevanceScore, { color: getRelevanceColor() }]}>
+                  Score: {Math.round(result.relevanceScore)}
+                </Text>
+              )}
+              {result.confidence && (
+                <Text style={styles.confidenceScore}>
+                  Confidence: {Math.round(result.confidence * 100)}%
+                </Text>
+              )}
+              <View style={styles.downloadStatusContainer}>
+                {getDownloadStatus()}
+                <Text style={styles.downloadStatusText}>
+                  {result.isDownloaded ? 'Downloaded' : 'Online'}
+                </Text>
+              </View>
+            </View>
           </View>
           
           {/* Audio Controls */}
@@ -560,16 +948,38 @@ export default function SearchScreen() {
             {result.translation && (
               <Text style={styles.translationText}>{result.translation}</Text>
             )}
+            
+            {/* Contextual matches for better understanding */}
+            {result.contextualMatches && result.contextualMatches.length > 0 && (
+              <View style={styles.contextualMatches}>
+                <Text style={styles.contextualTitle}>Context:</Text>
+                {result.contextualMatches.map((match, index) => (
+                  <Text key={index} style={styles.contextualText}>
+                    "...{match}..."
+                  </Text>
+                ))}
+              </View>
+            )}
+            
+            {/* Quality indicator */}
+            {result.recitationQuality && (
+              <View style={styles.qualityIndicator}>
+                <Text style={[
+                  styles.qualityText,
+                  {
+                    color: result.recitationQuality === 'high' ? Colors.success :
+                           result.recitationQuality === 'medium' ? Colors.warning : Colors.textLight
+                  }
+                ]}>
+                  {result.recitationQuality.toUpperCase()} QUALITY
+                </Text>
+              </View>
+            )}
           </View>
         )}
       </TouchableOpacity>
     );
   };
-  
-  // Update reciter when selection changes
-  useEffect(() => {
-    setReciter(selectedReciter);
-  }, [selectedReciter, setReciter]);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -583,7 +993,7 @@ export default function SearchScreen() {
         <View style={styles.headerContent}>
           <Search size={28} color={Colors.textOnPrimary} />
           <Text style={styles.title}>Ayat Search</Text>
-          <Text style={styles.subtitle}>Voice & Text Search</Text>
+          <Text style={styles.subtitle}>AI-Powered Voice & Text Search</Text>
         </View>
       </LinearGradient>
 
@@ -627,23 +1037,39 @@ export default function SearchScreen() {
             style={styles.reciterSelector}
             contentContainerStyle={styles.reciterSelectorContent}
           >
-            {TOP_RECITERS.slice(0, 8).map((reciter) => (
-              <TouchableOpacity
-                key={reciter.id}
-                style={[
-                  styles.reciterChip,
-                  selectedReciter === reciter.id && styles.reciterChipActive
-                ]}
-                onPress={() => setSelectedReciter(reciter.id)}
-              >
-                <Text style={[
-                  styles.reciterChipText,
-                  selectedReciter === reciter.id && styles.reciterChipTextActive
-                ]}>
-                  {reciter.name.split(' ')[0]}
-                </Text>
-              </TouchableOpacity>
-            ))}
+            {TOP_RECITERS.slice(0, 10).map((reciter) => {
+              const availability = reciterAvailability[reciter.id];
+              return (
+                <TouchableOpacity
+                  key={reciter.id}
+                  style={[
+                    styles.reciterChip,
+                    selectedReciter === reciter.id && styles.reciterChipActive,
+                    availability?.isDefault && styles.reciterChipDefault
+                  ]}
+                  onPress={() => setSelectedReciter(reciter.id)}
+                >
+                  <View style={styles.reciterChipContent}>
+                    <Text style={[
+                      styles.reciterChipText,
+                      selectedReciter === reciter.id && styles.reciterChipTextActive
+                    ]}>
+                      {reciter.name.split(' ')[0]}
+                    </Text>
+                    <View style={styles.reciterIndicators}>
+                      {availability?.isDefault && (
+                        <View style={styles.defaultIndicator}>
+                          <CheckCircle size={8} color={Colors.success} />
+                        </View>
+                      )}
+                      {availability?.quality === 'high' && (
+                        <Star size={8} color={Colors.islamicGold} />
+                      )}
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
           </ScrollView>
           
           {isRecording && (
@@ -681,15 +1107,36 @@ export default function SearchScreen() {
             <View style={styles.examplesContainer}>
               <Text style={styles.examplesTitle}>Try searching for:</Text>
               <View style={styles.exampleTags}>
-                {['Bismillah', 'Al-Fatihah', 'Ayat al-Kursi', 'Mishary'].map((example) => (
-                  <TouchableOpacity
-                    key={example}
-                    style={styles.exampleTag}
-                    onPress={() => handleTextSearch(example)}
-                  >
-                    <Text style={styles.exampleTagText}>{example}</Text>
-                  </TouchableOpacity>
-                ))}
+                <Text style={styles.exampleSubtitle}>Popular searches:</Text>
+                <View style={styles.exampleTagsRow}>
+                  {trendingSearches.slice(0, 4).map((example) => (
+                    <TouchableOpacity
+                      key={example}
+                      style={styles.exampleTag}
+                      onPress={() => handleTextSearch(example)}
+                    >
+                      <TrendingUp size={12} color={Colors.primary} />
+                      <Text style={styles.exampleTagText}>{example}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                
+                {searchHistory.length > 0 && (
+                  <>
+                    <Text style={styles.exampleSubtitle}>Recent searches:</Text>
+                    <View style={styles.exampleTagsRow}>
+                      {searchHistory.slice(0, 3).map((search, index) => (
+                        <TouchableOpacity
+                          key={index}
+                          style={[styles.exampleTag, styles.historyTag]}
+                          onPress={() => handleTextSearch(search)}
+                        >
+                          <Text style={[styles.exampleTagText, styles.historyTagText]}>{search}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </>
+                )}
               </View>
             </View>
           </View>
@@ -871,10 +1318,22 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   exampleTags: {
+    alignItems: 'center',
+    width: '100%',
+  },
+  exampleSubtitle: {
+    fontSize: 13,
+    color: Colors.textSecondary,
+    fontWeight: '600',
+    marginBottom: 8,
+    marginTop: 12,
+  },
+  exampleTagsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'center',
     gap: 8,
+    marginBottom: 8,
   },
   exampleTag: {
     backgroundColor: Colors.primaryOverlay,
@@ -883,11 +1342,21 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderWidth: 1,
     borderColor: Colors.primary,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   exampleTagText: {
     fontSize: 14,
     color: Colors.primary,
     fontWeight: '500',
+  },
+  historyTag: {
+    backgroundColor: Colors.secondaryOverlay,
+    borderColor: Colors.secondary,
+  },
+  historyTagText: {
+    color: Colors.secondary,
   },
   noResultsContainer: {
     flex: 1,
@@ -958,6 +1427,11 @@ const styles = StyleSheet.create({
     color: Colors.text,
     flex: 1,
   },
+  resultBadges: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
   typeLabel: {
     backgroundColor: Colors.secondaryOverlay,
     borderRadius: 12,
@@ -974,9 +1448,42 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     marginBottom: 2,
   },
-  resultDescription: {
-    fontSize: 14,
+  resultMetrics: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginTop: 4,
+  },
+  relevanceScore: {
+    fontSize: 12,
+    fontWeight: '500',
+    marginTop: 2,
+  },
+  confidenceScore: {
+    fontSize: 11,
+    color: Colors.secondary,
+    fontWeight: '500',
+  },
+  downloadStatusContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  downloadStatusText: {
+    fontSize: 10,
     color: Colors.textLight,
+    fontWeight: '500',
+  },
+  downloadProgress: {
+    backgroundColor: Colors.primaryOverlay,
+    borderRadius: 8,
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+  },
+  downloadProgressText: {
+    fontSize: 9,
+    color: Colors.primary,
+    fontWeight: '600',
   },
   arabicContainer: {
     marginTop: 12,
@@ -998,15 +1505,37 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     fontStyle: 'italic',
   },
+  contextualMatches: {
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: Colors.surfaceVariant,
+  },
+  contextualTitle: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  contextualText: {
+    fontSize: 12,
+    color: Colors.textLight,
+    fontStyle: 'italic',
+    marginBottom: 2,
+  },
+  qualityIndicator: {
+    alignSelf: 'flex-start',
+    marginTop: 6,
+  },
+  qualityText: {
+    fontSize: 9,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
   // New styles for enhanced search
   resultCardActive: {
     borderLeftColor: Colors.primary,
     backgroundColor: Colors.primaryOverlay,
-  },
-  relevanceScore: {
-    fontSize: 12,
-    fontWeight: '500',
-    marginTop: 2,
   },
   audioControls: {
     flexDirection: 'row',
@@ -1075,6 +1604,14 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primaryOverlay,
     borderColor: Colors.primary,
   },
+  reciterChipDefault: {
+    borderWidth: 2,
+    borderColor: Colors.success,
+  },
+  reciterChipContent: {
+    alignItems: 'center',
+    gap: 2,
+  },
   reciterChipText: {
     fontSize: 12,
     color: Colors.textSecondary,
@@ -1083,6 +1620,19 @@ const styles = StyleSheet.create({
   reciterChipTextActive: {
     color: Colors.primary,
     fontWeight: '600',
+  },
+  reciterIndicators: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+  },
+  defaultIndicator: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: Colors.primaryOverlay,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   resultsHeaderRow: {
     marginBottom: 16,
