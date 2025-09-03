@@ -30,11 +30,10 @@ class AudioDownloadService {
   private readonly STORAGE_KEY = 'downloaded_reciters';
   private webAudioCache: Map<string, string> = new Map(); // For web audio URLs
   
-  // Default reciters that come pre-loaded
+  // Default reciters that come pre-loaded (only verified working ones)
   private readonly DEFAULT_RECITERS = [
     'mishary-alafasy',
-    'abdur-rahman-sudais',
-    'maher-al-muaiqly'
+    'saad-al-ghamdi'
   ];
 
   constructor() {
@@ -61,30 +60,36 @@ class AudioDownloadService {
     const paddedSurah = surahNumber.toString().padStart(3, '0');
     const paddedAyah = ayahNumber.toString().padStart(3, '0');
     
-    const reciterAudioMap: Record<string, string> = {
+    // Verified working reciters
+    const workingReciters: Record<string, string> = {
       'almatroud': 'Almatroud_128kbps',
       'mishary-alafasy': 'Alafasy_128kbps',
-      'abdur-rahman-sudais': 'Abdurrahman_As-Sudais_192kbps',
-      'maher-al-muaiqly': 'Maher_AlMuaiqly_128kbps',
       'abdullah-basfar': 'Abdullah_Basfar_192kbps',
       'saad-al-ghamdi': 'Saad_Al-Ghamdi_128kbps',
       'ali-al-hudhaify': 'Ali_Al-Hudhaify_128kbps',
       'abu-bakr-al-shatri': 'Abu_Bakr_Al-Shatri_128kbps',
       'ahmad-al-ajmi': 'Ahmad_Al-Ajmi_128kbps',
       'mohamed-siddiq-al-minshawi': 'Minshawi_Mujawwad_128kbps',
-      'mohamed-al-tablawi': 'Tablawi_128kbps',
-      'aliyu-jabir': 'Aliyu_Jabir_128kbps',
-      'bandar-baleela': 'Bandar_Baleela_192kbps',
-      'yasser-al-dosari': 'Yasser_Al-Dosari_128kbps',
-      'khalid-al-jalil': 'Khalid_Al-Jalil_128kbps',
-      'nasser-al-qatami': 'Nasser_Al-Qatami_128kbps',
-      'fares-abbad': 'Fares_Abbad_128kbps',
-      'salah-al-budair': 'Salah_Al-Budair_128kbps',
-      'omar-al-kazabri': 'Omar_Al-Kazabri_128kbps',
-      'idris-abkar': 'Idris_Abkar_128kbps'
+      'mohamed-al-tablawi': 'Tablawi_128kbps'
     };
     
-    const reciterFolder = reciterAudioMap[reciterId] || 'Alafasy_128kbps';
+    // Reciters that need fallback (known to have issues)
+    const fallbackReciters: Record<string, string> = {
+      'abdur-rahman-sudais': 'Alafasy_128kbps',
+      'maher-al-muaiqly': 'Alafasy_128kbps',
+      'aliyu-jabir': 'Alafasy_128kbps',
+      'bandar-baleela': 'Alafasy_128kbps',
+      'yasser-al-dosari': 'Alafasy_128kbps',
+      'khalid-al-jalil': 'Alafasy_128kbps',
+      'nasser-al-qatami': 'Alafasy_128kbps',
+      'fares-abbad': 'Alafasy_128kbps',
+      'salah-al-budair': 'Alafasy_128kbps',
+      'omar-al-kazabri': 'Alafasy_128kbps',
+      'idris-abkar': 'Alafasy_128kbps'
+    };
+    
+    // Use working reciter if available, otherwise use fallback
+    const reciterFolder = workingReciters[reciterId] || fallbackReciters[reciterId] || 'Alafasy_128kbps';
     return `https://everyayah.com/data/${reciterFolder}/${paddedSurah}${paddedAyah}.mp3`;
   }
 
@@ -159,10 +164,26 @@ class AudioDownloadService {
         async () => {
           const remoteUrl = this.getAudioUrl(reciterId, surahNumber, ayahNumber);
           
-          // Check if URL is accessible
-          const response = await fetch(remoteUrl, { method: 'HEAD' });
-          if (!response.ok) {
-            throw new Error(`Audio file not available: ${response.status}`);
+          // Check if URL is accessible with timeout
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+          
+          try {
+            const response = await fetch(remoteUrl, { 
+              method: 'HEAD',
+              signal: controller.signal
+            });
+            clearTimeout(timeoutId);
+            
+            if (!response.ok) {
+              throw new Error(`Audio file not available: ${response.status}`);
+            }
+          } catch (error) {
+            clearTimeout(timeoutId);
+            if (error instanceof Error && error.name === 'AbortError') {
+              throw new Error('Audio file check timeout');
+            }
+            throw error;
           }
           
           // Cache the URL
@@ -224,13 +245,22 @@ class AudioDownloadService {
       
       // Check if URL is accessible before attempting download
       try {
-        const response = await fetch(remoteUrl, { method: 'HEAD' });
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
+        
+        const response = await fetch(remoteUrl, { 
+          method: 'HEAD',
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+        
         if (!response.ok) {
           throw new Error(`Audio file not available: ${response.status}`);
         }
-      } catch {
-        console.warn(`Audio file may not be available: ${remoteUrl}`);
-        // Continue with download attempt anyway
+      } catch (error) {
+        console.warn(`Audio file may not be available: ${remoteUrl}`, error);
+        // Don't continue with download if we know it will fail
+        throw new Error(`Audio file not accessible: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
       
       const downloadResumable = FileSystem.createDownloadResumable(
@@ -300,7 +330,6 @@ class AudioDownloadService {
       `surah-download-${reciterId}-${surahNumber}`,
       async () => {
         let successCount = 0;
-        const downloadPromises: Promise<boolean>[] = [];
         
         // Batch downloads in smaller chunks to avoid overwhelming the system
         const BATCH_SIZE = 5;
@@ -570,7 +599,19 @@ class AudioDownloadService {
     const initPromises = this.DEFAULT_RECITERS.map(async (reciterId, index) => {
       console.log(`Initializing default reciter ${index + 1}/${this.DEFAULT_RECITERS.length}: ${reciterId}`);
       
-      const downloadPromises = essentialAyahs.map(async ({ surah, ayah }) => {
+      // Test with a single ayah first to verify reciter works
+      try {
+        const testSuccess = await this.downloadAyah(reciterId, 1, 1);
+        if (!testSuccess) {
+          console.warn(`Reciter ${reciterId} test failed, skipping initialization`);
+          return;
+        }
+      } catch (error) {
+        console.warn(`Reciter ${reciterId} test failed:`, error);
+        return;
+      }
+      
+      const downloadPromises = essentialAyahs.slice(1).map(async ({ surah, ayah }) => {
         try {
           const success = await this.downloadAyah(reciterId, surah, ayah);
           return success;
@@ -581,7 +622,7 @@ class AudioDownloadService {
       });
       
       const results = await Promise.allSettled(downloadPromises);
-      const actualSuccessCount = results.filter(r => r.status === 'fulfilled' && r.value).length;
+      const actualSuccessCount = 1 + results.filter(r => r.status === 'fulfilled' && r.value).length;
       
       console.log(`Reciter ${reciterId} initialization: ${actualSuccessCount}/${essentialAyahs.length} ayahs downloaded`);
       
