@@ -28,6 +28,8 @@ export default function SurahsScreen() {
 
   const totalAyahs = getTotalAyahs();
   
+
+  
   const handlePlaySurah = async (surahId: number, totalAyahs: number) => {
     try {
       await audioPlayer.playWholeSurah(surahId, totalAyahs);

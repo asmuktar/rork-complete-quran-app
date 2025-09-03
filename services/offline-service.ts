@@ -47,22 +47,49 @@ class OfflineService {
     try {
       const data = await AsyncStorage.getItem(this.OFFLINE_DATA_KEY);
       if (data) {
-        this.offlineData = JSON.parse(data);
+        const parsedData = JSON.parse(data);
+        // Validate data structure to prevent corruption
+        if (this.isValidOfflineData(parsedData)) {
+          this.offlineData = parsedData;
+        } else {
+          console.log('Invalid offline data detected, resetting to clean state');
+          await this.resetToCleanState();
+        }
       } else {
         // Initialize with basic data
-        this.offlineData = {
-          surahs: SURAHS,
-          translations: {},
-          audio: {},
-          hadithCollections: HADITH_COLLECTIONS,
-          prayerTimes: {},
-          lastUpdated: Date.now()
-        };
-        await this.saveOfflineData();
+        await this.resetToCleanState();
       }
     } catch (error) {
       console.error('Error loading offline data:', error);
+      await this.resetToCleanState();
     }
+  }
+  
+  private isValidOfflineData(data: any): boolean {
+    // Check if the data has the expected structure
+    if (!data || typeof data !== 'object') return false;
+    if (!Array.isArray(data.surahs)) return false;
+    
+    // Check if surahs have the expected local structure
+    const firstSurah = data.surahs[0];
+    if (firstSurah && (firstSurah.numberInSurah !== undefined || firstSurah.manzil !== undefined)) {
+      // This indicates API data structure, which we want to avoid
+      return false;
+    }
+    
+    return true;
+  }
+  
+  private async resetToCleanState() {
+    this.offlineData = {
+      surahs: SURAHS,
+      translations: {},
+      audio: {},
+      hadithCollections: HADITH_COLLECTIONS,
+      prayerTimes: {},
+      lastUpdated: Date.now()
+    };
+    await this.saveOfflineData();
   }
 
   private async saveOfflineData() {
@@ -148,16 +175,8 @@ class OfflineService {
       const data = await quranApi.getSurah(surahNumber, edition);
       await this.setCache(cacheKey, data);
       
-      // Update offline data
-      if (this.offlineData) {
-        const existingIndex = this.offlineData.surahs.findIndex(s => s.number === surahNumber);
-        if (existingIndex >= 0) {
-          this.offlineData.surahs[existingIndex] = data;
-        } else {
-          this.offlineData.surahs.push(data);
-        }
-        await this.saveOfflineData();
-      }
+      // Don't update offline data with API data to prevent structure conflicts
+      // Keep local SURAHS data intact
       
       return data;
     } catch (error) {
@@ -243,11 +262,8 @@ class OfflineService {
       const data = await quranApi.getAllSurahs();
       await this.setCache(cacheKey, data);
       
-      // Update offline data
-      if (this.offlineData) {
-        this.offlineData.surahs = data;
-        await this.saveOfflineData();
-      }
+      // Don't update offline data with API data to prevent structure conflicts
+      // Keep local SURAHS data intact
       
       return data;
     } catch {
@@ -281,8 +297,9 @@ class OfflineService {
       const surahs = await quranApi.getAllSurahs();
       await this.setCache('all_surahs', surahs);
       
+      // Don't update offline data with API data to prevent structure conflicts
+      // Keep local SURAHS data intact
       if (this.offlineData) {
-        this.offlineData.surahs = surahs;
         this.offlineData.lastUpdated = Date.now();
         await this.saveOfflineData();
       }
