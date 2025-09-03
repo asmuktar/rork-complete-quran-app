@@ -388,6 +388,22 @@ class AudioDownloadService {
     }
   }
 
+  async downloadSelectedSurahs(reciterId: string, surahIds: number[]): Promise<void> {
+    console.log(`Starting download of selected surahs for reciter ${reciterId}:`, surahIds);
+    
+    // Import SURAHS to get ayah counts
+    const { SURAHS } = await import('@/constants/quran-data');
+    
+    for (const surahId of surahIds) {
+      const surah = SURAHS.find(s => s.id === surahId);
+      if (surah) {
+        await this.downloadSurah(reciterId, surahId, surah.ayahs);
+      } else {
+        console.warn(`Surah with ID ${surahId} not found`);
+      }
+    }
+  }
+
   private async updateReciterDownloadInfo(reciterId: string, surahNumber: number) {
     try {
       const stored = await AsyncStorage.getItem(this.STORAGE_KEY);

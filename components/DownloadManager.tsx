@@ -323,7 +323,7 @@ export default function DownloadManager({ reciterId, onDownloadComplete }: Downl
                           {surah.id}. {surah.englishName}
                         </Text>
                         <Text style={styles.surahMeta}>
-                          {surah.arabicName} • {surah.ayahs} ayahs • {surah.type}
+                          {surah.arabicName} • {surah.ayahs} ayahs • {surah.revelationType}
                         </Text>
                       </View>
                       
