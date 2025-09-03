@@ -404,21 +404,33 @@ class AudioDownloadService {
     // Download essential ayahs for default reciters
     const essentialAyahs = [
       { surah: 1, ayah: 1 }, // Al-Fatihah opening
+      { surah: 1, ayah: 2 }, // Al-Fatihah second ayah
+      { surah: 1, ayah: 7 }, // Al-Fatihah last ayah
       { surah: 2, ayah: 255 }, // Ayat al-Kursi
       { surah: 112, ayah: 1 }, // Al-Ikhlas
+      { surah: 112, ayah: 2 }, // Al-Ikhlas
+      { surah: 112, ayah: 3 }, // Al-Ikhlas
+      { surah: 112, ayah: 4 }, // Al-Ikhlas
+      { surah: 113, ayah: 1 }, // Al-Falaq
+      { surah: 114, ayah: 1 }, // An-Nas
     ];
     
-    for (const reciterId of this.DEFAULT_RECITERS) {
+    // Initialize default reciters in parallel for better performance
+    const initPromises = this.DEFAULT_RECITERS.map(async (reciterId) => {
       console.log(`Initializing default reciter: ${reciterId}`);
       
-      for (const { surah, ayah } of essentialAyahs) {
+      const downloadPromises = essentialAyahs.map(async ({ surah, ayah }) => {
         try {
           await this.downloadAyah(reciterId, surah, ayah);
         } catch (error) {
-          console.error(`Failed to download essential ayah for ${reciterId}:`, error);
+          console.error(`Failed to download essential ayah ${surah}:${ayah} for ${reciterId}:`, error);
         }
-      }
-    }
+      });
+      
+      await Promise.allSettled(downloadPromises);
+    });
+    
+    await Promise.allSettled(initPromises);
     
     // Mark as initialized
     await AsyncStorage.setItem('default_reciters_initialized', 'true');

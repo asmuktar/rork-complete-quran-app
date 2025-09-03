@@ -5,6 +5,7 @@ import React, { useEffect } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { trpc, trpcClient } from "@/lib/trpc";
 import audioDownloadService from "@/services/audio-download-service";
+import { HafizProvider } from "@/contexts/hafiz-context";
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
@@ -29,6 +30,7 @@ function RootLayoutNav() {
       <Stack.Screen name="favorites" options={{ title: "Favorites" }} />
       <Stack.Screen name="settings" options={{ title: "Settings" }} />
       <Stack.Screen name="about" options={{ title: "About" }} />
+      <Stack.Screen name="hafiz-dashboard" options={{ title: "Hafiz Dashboard" }} />
     </Stack>
   );
 }
@@ -55,9 +57,11 @@ export default function RootLayout() {
   return (
     <trpc.Provider client={trpcClient} queryClient={queryClient}>
       <QueryClientProvider client={queryClient}>
-        <GestureHandlerRootView>
-          <RootLayoutNav />
-        </GestureHandlerRootView>
+        <HafizProvider>
+          <GestureHandlerRootView>
+            <RootLayoutNav />
+          </GestureHandlerRootView>
+        </HafizProvider>
       </QueryClientProvider>
     </trpc.Provider>
   );
