@@ -6,6 +6,8 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { trpc, trpcClient } from "@/lib/trpc";
 import audioDownloadService from "@/services/audio-download-service";
 import { HafizProvider } from "@/contexts/hafiz-context";
+import { BookmarkProvider } from "@/contexts/bookmark-context";
+import notificationService from "@/services/notification-service";
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
@@ -29,6 +31,7 @@ function RootLayoutNav() {
       <Stack.Screen name="bookmarks" options={{ title: "Bookmarks" }} />
       <Stack.Screen name="favorites" options={{ title: "Favorites" }} />
       <Stack.Screen name="settings" options={{ title: "Settings" }} />
+      <Stack.Screen name="notification-settings" options={{ title: "Notifications" }} />
       <Stack.Screen name="about" options={{ title: "About" }} />
       <Stack.Screen name="hafiz-dashboard" options={{ title: "Hafiz Dashboard" }} />
     </Stack>
@@ -44,6 +47,11 @@ export default function RootLayout() {
           console.error('Failed to initialize default reciters:', error);
         });
         
+        // Initialize notification service
+        notificationService.initialize().catch(error => {
+          console.error('Failed to initialize notification service:', error);
+        });
+        
         await SplashScreen.hideAsync();
       } catch (error) {
         console.error('Error initializing app:', error);
@@ -57,11 +65,13 @@ export default function RootLayout() {
   return (
     <trpc.Provider client={trpcClient} queryClient={queryClient}>
       <QueryClientProvider client={queryClient}>
-        <HafizProvider>
-          <GestureHandlerRootView>
-            <RootLayoutNav />
-          </GestureHandlerRootView>
-        </HafizProvider>
+        <BookmarkProvider>
+          <HafizProvider>
+            <GestureHandlerRootView>
+              <RootLayoutNav />
+            </GestureHandlerRootView>
+          </HafizProvider>
+        </BookmarkProvider>
       </QueryClientProvider>
     </trpc.Provider>
   );

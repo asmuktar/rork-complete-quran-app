@@ -1,77 +1,110 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Bookmark, BookmarkCheck, Volume2, Trash2 } from 'lucide-react-native';
+import { Bookmark, BookmarkCheck, Volume2, Trash2, Search, Filter, Plus, Heart, Brain, BookOpen, Settings } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors } from '@/constants/colors';
+import { useBookmarks, Bookmark as BookmarkType, BookmarkCollection } from '@/contexts/bookmark-context';
 
-interface BookmarkedAyah {
-  id: string;
-  surahId: number;
-  surahName: string;
-  surahArabicName: string;
-  ayahNumber: number;
-  ayahText: string;
-  translation: string;
-  dateBookmarked: Date;
-}
 
-// Mock bookmarked ayahs - in real app, this would come from AsyncStorage
-const mockBookmarks: BookmarkedAyah[] = [
-  {
-    id: '1-1',
-    surahId: 1,
-    surahName: 'Al-Fatihah',
-    surahArabicName: 'الفاتحة',
-    ayahNumber: 1,
-    ayahText: 'بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ',
-    translation: 'In the name of Allah, the Entirely Merciful, the Especially Merciful.',
-    dateBookmarked: new Date('2024-01-15'),
-  },
-  {
-    id: '2-255',
-    surahId: 2,
-    surahName: 'Al-Baqarah',
-    surahArabicName: 'البقرة',
-    ayahNumber: 255,
-    ayahText: 'اللَّهُ لَا إِلَٰهَ إِلَّا هُوَ الْحَيُّ الْقَيُّومُ',
-    translation: 'Allah - there is no deity except Him, the Ever-Living, the Sustainer of existence.',
-    dateBookmarked: new Date('2024-01-10'),
-  },
-  {
-    id: '36-1',
-    surahId: 36,
-    surahName: 'Ya-Sin',
-    surahArabicName: 'يس',
-    ayahNumber: 1,
-    ayahText: 'يس',
-    translation: 'Ya-Seen.',
-    dateBookmarked: new Date('2024-01-05'),
-  },
-];
 
 export default function BookmarksScreen() {
-  const [bookmarks, setBookmarks] = useState<BookmarkedAyah[]>(mockBookmarks);
-  // const [searchQuery, setSearchQuery] = useState('');
+  const {
+    bookmarks,
+    collections,
+    getBookmarksByCollection,
+    removeBookmark,
+    searchBookmarks,
+    getBookmarkStats,
+    getBookmarkTitle,
+    isLoading
+  } = useBookmarks();
+  
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCollection, setSelectedCollection] = useState<string>('all');
+  const [filterType, setFilterType] = useState<BookmarkType['type'] | 'all'>('all');
 
-  const filteredBookmarks = bookmarks; // TODO: Add search functionality
-
-  const removeBookmark = (bookmarkId: string) => {
-    setBookmarks(prev => prev.filter(bookmark => bookmark.id !== bookmarkId));
+  const getFilteredBookmarks = () => {
+    let filtered: BookmarkType[] = [];
+    
+    if (selectedCollection === 'all') {
+      filtered = bookmarks;
+    } else {
+      filtered = getBookmarksByCollection(selectedCollection);
+    }
+    
+    if (filterType !== 'all') {
+      filtered = filtered.filter(b => b.type === filterType);
+    }
+    
+    if (searchQuery.trim()) {
+      filtered = searchBookmarks(searchQuery, filterType === 'all' ? undefined : filterType);
+    }
+    
+    return filtered;
   };
 
-  const navigateToAyah = (surahId: number, ayahNumber: number) => {
-    router.push(`/surah/${surahId}?ayah=${ayahNumber}` as any);
+  const handleRemoveBookmark = (bookmarkId: string) => {
+    Alert.alert(
+      'Remove Bookmark',
+      'Are you sure you want to remove this bookmark?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: () => removeBookmark(bookmarkId)
+        }
+      ]
+    );
   };
 
-  const formatDate = (date: Date) => {
-    return date.toLocaleDateString('en-US', {
+  const navigateToContent = (bookmark: BookmarkType) => {
+    switch (bookmark.type) {
+      case 'ayah':
+        router.push(`/surah/${bookmark.surahId}?ayah=${bookmark.ayahNumber}` as any);
+        break;
+      case 'hadith':
+        router.push(`/hadith-collection/${bookmark.collectionId}?hadith=${bookmark.hadithNumber}` as any);
+        break;
+      case 'reciter':
+        router.push(`/reciter/${bookmark.reciterId}` as any);
+        break;
+      default:
+        break;
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
       day: 'numeric'
     });
   };
+
+  const getCollectionIcon = (collection: BookmarkCollection) => {
+    switch (collection.icon) {
+      case 'heart': return Heart;
+      case 'brain': return Brain;
+      case 'book-open': return BookOpen;
+      default: return Bookmark;
+    }
+  };
+
+  const filteredBookmarks = getFilteredBookmarks();
+  const stats = getBookmarkStats();
+
+  if (isLoading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <Text style={styles.loadingText}>Loading bookmarks...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -85,13 +118,93 @@ export default function BookmarksScreen() {
         </View>
       </LinearGradient>
 
-      {bookmarks.length === 0 ? (
+      {/* Search and Filter Bar */}
+      <View style={styles.searchContainer}>
+        <View style={styles.searchInputContainer}>
+          <Search size={20} color={Colors.textLight} style={styles.searchIcon} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search bookmarks..."
+            placeholderTextColor={Colors.textLight}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+        </View>
+        <TouchableOpacity style={styles.filterButton}>
+          <Filter size={20} color={Colors.primary} />
+        </TouchableOpacity>
+      </View>
+
+      {/* Collection Tabs */}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.collectionsContainer}>
+        <TouchableOpacity
+          style={[
+            styles.collectionTab,
+            selectedCollection === 'all' && styles.collectionTabActive
+          ]}
+          onPress={() => setSelectedCollection('all')}
+        >
+          <Text style={[
+            styles.collectionTabText,
+            selectedCollection === 'all' && styles.collectionTabTextActive
+          ]}>All ({stats.total})</Text>
+        </TouchableOpacity>
+        
+        {collections.map((collection) => {
+          const Icon = getCollectionIcon(collection);
+          const count = getBookmarksByCollection(collection.id).length;
+          
+          return (
+            <TouchableOpacity
+              key={collection.id}
+              style={[
+                styles.collectionTab,
+                selectedCollection === collection.id && styles.collectionTabActive
+              ]}
+              onPress={() => setSelectedCollection(collection.id)}
+            >
+              <Icon size={16} color={selectedCollection === collection.id ? Colors.textOnPrimary : Colors.primary} />
+              <Text style={[
+                styles.collectionTabText,
+                selectedCollection === collection.id && styles.collectionTabTextActive
+              ]}>{collection.name} ({count})</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
+
+      {/* Type Filter */}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.typeFilterContainer}>
+        {(['all', 'ayah', 'hadith', 'dua', 'reciter'] as const).map((type) => (
+          <TouchableOpacity
+            key={type}
+            style={[
+              styles.typeFilterTab,
+              filterType === type && styles.typeFilterTabActive
+            ]}
+            onPress={() => setFilterType(type)}
+          >
+            <Text style={[
+              styles.typeFilterText,
+              filterType === type && styles.typeFilterTextActive
+            ]}>
+              {type === 'all' ? 'All' : type.charAt(0).toUpperCase() + type.slice(1)}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+
+      {filteredBookmarks.length === 0 ? (
         <View style={styles.emptyState}>
           <BookmarkCheck size={64} color={Colors.textLight} />
-          <Text style={styles.emptyTitle}>No Bookmarks Yet</Text>
+          <Text style={styles.emptyTitle}>
+            {searchQuery ? 'No Results Found' : 'No Bookmarks Yet'}
+          </Text>
           <Text style={styles.emptyDescription}>
-            Start bookmarking your favorite ayahs while reading the Quran. 
-            They will appear here for easy access.
+            {searchQuery 
+              ? `No bookmarks match "${searchQuery}". Try a different search term.`
+              : 'Start bookmarking your favorite content while exploring the app. They will appear here for easy access.'
+            }
           </Text>
           <TouchableOpacity
             style={styles.exploreButton}
@@ -114,8 +227,8 @@ export default function BookmarksScreen() {
                 colors={Colors.gradients.primary as [string, string]}
                 style={styles.statGradient}
               >
-                <Text style={styles.statNumber}>{bookmarks.length}</Text>
-                <Text style={styles.statLabel}>Bookmarks</Text>
+                <Text style={styles.statNumber}>{stats.total}</Text>
+                <Text style={styles.statLabel}>Total</Text>
               </LinearGradient>
             </View>
             <View style={styles.statCard}>
@@ -123,10 +236,8 @@ export default function BookmarksScreen() {
                 colors={Colors.gradients.accent as [string, string]}
                 style={styles.statGradient}
               >
-                <Text style={styles.statNumber}>
-                  {new Set(bookmarks.map(b => b.surahId)).size}
-                </Text>
-                <Text style={styles.statLabel}>Surahs</Text>
+                <Text style={styles.statNumber}>{stats.ayahs}</Text>
+                <Text style={styles.statLabel}>Ayahs</Text>
               </LinearGradient>
             </View>
             <View style={styles.statCard}>
@@ -134,54 +245,110 @@ export default function BookmarksScreen() {
                 colors={Colors.gradients.sunset as [string, string]}
                 style={styles.statGradient}
               >
-                <Text style={styles.statNumber}>
-                  {bookmarks.length > 0 ? Math.ceil((Date.now() - Math.min(...bookmarks.map(b => b.dateBookmarked.getTime()))) / (1000 * 60 * 60 * 24)) : 0}
-                </Text>
-                <Text style={styles.statLabel}>Days</Text>
+                <Text style={styles.statNumber}>{stats.hadiths}</Text>
+                <Text style={styles.statLabel}>Hadiths</Text>
+              </LinearGradient>
+            </View>
+            <View style={styles.statCard}>
+              <LinearGradient
+                colors={Colors.gradients.islamic as [string, string]}
+                style={styles.statGradient}
+              >
+                <Text style={styles.statNumber}>{stats.collections}</Text>
+                <Text style={styles.statLabel}>Collections</Text>
               </LinearGradient>
             </View>
           </View>
 
           {/* Bookmarks List */}
           <View style={styles.bookmarksSection}>
-            <Text style={styles.sectionTitle}>Your Bookmarks</Text>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>
+                {selectedCollection === 'all' ? 'All Bookmarks' : collections.find(c => c.id === selectedCollection)?.name}
+              </Text>
+              <Text style={styles.sectionCount}>({filteredBookmarks.length})</Text>
+            </View>
+            
             {filteredBookmarks.map((bookmark) => (
               <View key={bookmark.id} style={styles.bookmarkCard}>
                 <TouchableOpacity
                   style={styles.bookmarkContent}
-                  onPress={() => navigateToAyah(bookmark.surahId, bookmark.ayahNumber)}
+                  onPress={() => navigateToContent(bookmark)}
                   activeOpacity={0.8}
                 >
                   <View style={styles.bookmarkHeader}>
-                    <View style={styles.surahInfo}>
-                      <Text style={styles.surahName}>{bookmark.surahName}</Text>
-                      <Text style={styles.surahArabicName}>{bookmark.surahArabicName}</Text>
-                    </View>
-                    <View style={styles.ayahNumber}>
-                      <Text style={styles.ayahNumberText}>{bookmark.ayahNumber}</Text>
+                    <View style={styles.bookmarkInfo}>
+                      <View style={styles.bookmarkTypeContainer}>
+                        <Text style={styles.bookmarkType}>{bookmark.type.toUpperCase()}</Text>
+                      </View>
+                      <Text style={styles.bookmarkTitle}>{getBookmarkTitle(bookmark)}</Text>
+                      {bookmark.type === 'ayah' && (
+                        <Text style={styles.bookmarkSubtitle}>{bookmark.surahArabicName}</Text>
+                      )}
+                      {bookmark.type === 'hadith' && (
+                        <Text style={styles.bookmarkSubtitle}>Narrator: {bookmark.narrator}</Text>
+                      )}
+                      {bookmark.type === 'reciter' && (
+                        <Text style={styles.bookmarkSubtitle}>{bookmark.style}</Text>
+                      )}
                     </View>
                   </View>
 
-                  <Text style={styles.ayahText}>{bookmark.ayahText}</Text>
-                  <Text style={styles.ayahTranslation}>{bookmark.translation}</Text>
+                  {bookmark.type === 'ayah' && (
+                    <>
+                      <Text style={styles.arabicText}>{bookmark.ayahText}</Text>
+                      <Text style={styles.translationText}>{bookmark.translation}</Text>
+                    </>
+                  )}
+                  
+                  {bookmark.type === 'hadith' && (
+                    <>
+                      <Text style={styles.arabicText}>{bookmark.hadithText}</Text>
+                      <Text style={styles.translationText}>{bookmark.translation}</Text>
+                    </>
+                  )}
+                  
+                  {bookmark.type === 'dua' && (
+                    <>
+                      <Text style={styles.arabicText}>{bookmark.arabicText}</Text>
+                      {bookmark.transliteration && (
+                        <Text style={styles.transliterationText}>{bookmark.transliteration}</Text>
+                      )}
+                      <Text style={styles.translationText}>{bookmark.translation}</Text>
+                    </>
+                  )}
 
                   <View style={styles.bookmarkMeta}>
                     <Text style={styles.bookmarkDate}>
                       Saved on {formatDate(bookmark.dateBookmarked)}
                     </Text>
+                    {bookmark.tags.length > 0 && (
+                      <View style={styles.tagsContainer}>
+                        {bookmark.tags.slice(0, 3).map((tag, index) => (
+                          <View key={index} style={styles.tag}>
+                            <Text style={styles.tagText}>{tag}</Text>
+                          </View>
+                        ))}
+                        {bookmark.tags.length > 3 && (
+                          <Text style={styles.moreTagsText}>+{bookmark.tags.length - 3}</Text>
+                        )}
+                      </View>
+                    )}
                   </View>
                 </TouchableOpacity>
 
                 <View style={styles.bookmarkActions}>
+                  {bookmark.type === 'ayah' && (
+                    <TouchableOpacity
+                      style={styles.actionButton}
+                      onPress={() => {/* TODO: Play ayah */}}
+                    >
+                      <Volume2 size={20} color={Colors.primary} />
+                    </TouchableOpacity>
+                  )}
                   <TouchableOpacity
                     style={styles.actionButton}
-                    onPress={() => {/* TODO: Play ayah */}}
-                  >
-                    <Volume2 size={20} color={Colors.primary} />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.actionButton}
-                    onPress={() => removeBookmark(bookmark.id)}
+                    onPress={() => handleRemoveBookmark(bookmark.id)}
                   >
                     <Trash2 size={20} color={Colors.error} />
                   </TouchableOpacity>
@@ -194,16 +361,32 @@ export default function BookmarksScreen() {
           <View style={styles.tipsCard}>
             <Text style={styles.tipsTitle}>💡 Tips</Text>
             <Text style={styles.tipsText}>
-              • Tap the bookmark icon while reading any ayah to save it{'\n'}
-              • Use bookmarks for memorization practice{'\n'}
-              • Share your favorite verses with friends{'\n'}
-              • Review bookmarks regularly for spiritual reflection
+              • Bookmark ayahs, hadiths, duas, and reciters across the app{'\n'}
+              • Organize bookmarks into collections for better management{'\n'}
+              • Use search to quickly find specific bookmarks{'\n'}
+              • Add tags and notes to your bookmarks for context{'\n'}
+              • Export your bookmarks to backup or share with others
             </Text>
+          </View>
+
+          {/* Quick Actions */}
+          <View style={styles.quickActionsCard}>
+            <Text style={styles.quickActionsTitle}>Quick Actions</Text>
+            <View style={styles.quickActionsContainer}>
+              <TouchableOpacity style={styles.quickActionButton}>
+                <Plus size={20} color={Colors.primary} />
+                <Text style={styles.quickActionText}>New Collection</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.quickActionButton}>
+                <Settings size={20} color={Colors.primary} />
+                <Text style={styles.quickActionText}>Settings</Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
           <View style={styles.footer}>
             <Text style={styles.footerText}>
-  &quot;And We have made the Quran easy to remember&quot;
+              &quot;And We have made the Quran easy to remember&quot;
             </Text>
             <Text style={styles.footerSubtext}>- Quran 54:17</Text>
           </View>
@@ -461,5 +644,218 @@ const styles = StyleSheet.create({
     color: Colors.textLight,
     textAlign: 'center',
     fontWeight: '500',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: 16,
+    color: Colors.textSecondary,
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    gap: 12,
+  },
+  searchInputContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.surface,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    elevation: 2,
+    shadowColor: Colors.text,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+  searchIcon: {
+    marginRight: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    color: Colors.text,
+    paddingVertical: 12,
+  },
+  filterButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: Colors.surface,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 2,
+    shadowColor: Colors.text,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+  collectionsContainer: {
+    paddingHorizontal: 20,
+    marginBottom: 12,
+  },
+  collectionTab: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    marginRight: 12,
+    borderRadius: 20,
+    backgroundColor: Colors.surface,
+    gap: 6,
+  },
+  collectionTabActive: {
+    backgroundColor: Colors.primary,
+  },
+  collectionTabText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.primary,
+  },
+  collectionTabTextActive: {
+    color: Colors.textOnPrimary,
+  },
+  typeFilterContainer: {
+    paddingHorizontal: 20,
+    marginBottom: 16,
+  },
+  typeFilterTab: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    marginRight: 8,
+    borderRadius: 16,
+    backgroundColor: Colors.surfaceVariant,
+  },
+  typeFilterTabActive: {
+    backgroundColor: Colors.primaryOverlay,
+  },
+  typeFilterText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: Colors.textSecondary,
+  },
+  typeFilterTextActive: {
+    color: Colors.primary,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  sectionCount: {
+    fontSize: 16,
+    color: Colors.textLight,
+    marginLeft: 8,
+  },
+  bookmarkInfo: {
+    flex: 1,
+  },
+  bookmarkTypeContainer: {
+    alignSelf: 'flex-start',
+    backgroundColor: Colors.primaryOverlay,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  bookmarkType: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    color: Colors.primary,
+  },
+  bookmarkTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: Colors.text,
+    marginBottom: 4,
+  },
+  bookmarkSubtitle: {
+    fontSize: 14,
+    color: Colors.textSecondary,
+  },
+  arabicText: {
+    fontSize: 18,
+    lineHeight: 28,
+    color: Colors.text,
+    textAlign: 'right',
+    marginBottom: 8,
+    fontWeight: '500',
+  },
+  translationText: {
+    fontSize: 14,
+    lineHeight: 20,
+    color: Colors.textSecondary,
+    marginBottom: 12,
+  },
+  transliterationText: {
+    fontSize: 14,
+    lineHeight: 20,
+    color: Colors.textLight,
+    fontStyle: 'italic',
+    marginBottom: 8,
+  },
+  tagsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 8,
+    gap: 6,
+  },
+  tag: {
+    backgroundColor: Colors.primaryOverlay,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  tagText: {
+    fontSize: 10,
+    color: Colors.primary,
+    fontWeight: '600',
+  },
+  moreTagsText: {
+    fontSize: 10,
+    color: Colors.textLight,
+    fontWeight: '600',
+  },
+  quickActionsCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 24,
+    elevation: 2,
+    shadowColor: Colors.text,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+  quickActionsTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: Colors.text,
+    marginBottom: 16,
+  },
+  quickActionsContainer: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  quickActionButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: Colors.primaryOverlay,
+    borderRadius: 12,
+    gap: 8,
+  },
+  quickActionText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.primary,
   },
 });
