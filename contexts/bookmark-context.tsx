@@ -244,9 +244,32 @@ export const [BookmarkProvider, useBookmarks] = createContextHook(() => {
   }, [bookmarks, collections]);
 
   const updateBookmark = useCallback(async (bookmarkId: string, updates: Partial<Bookmark>) => {
-    const updatedBookmarks = bookmarks.map(bookmark =>
-      bookmark.id === bookmarkId ? { ...bookmark, ...updates } : bookmark
-    );
+    const updatedBookmarks: Bookmark[] = [];
+    
+    for (const bookmark of bookmarks) {
+      if (bookmark.id === bookmarkId) {
+        // Create a properly typed updated bookmark based on the original type
+        switch (bookmark.type) {
+          case 'ayah':
+            updatedBookmarks.push({ ...bookmark, ...updates } as BookmarkedAyah);
+            break;
+          case 'hadith':
+            updatedBookmarks.push({ ...bookmark, ...updates } as BookmarkedHadith);
+            break;
+          case 'dua':
+            updatedBookmarks.push({ ...bookmark, ...updates } as BookmarkedDua);
+            break;
+          case 'reciter':
+            updatedBookmarks.push({ ...bookmark, ...updates } as BookmarkedReciter);
+            break;
+          default:
+            updatedBookmarks.push(bookmark);
+        }
+      } else {
+        updatedBookmarks.push(bookmark);
+      }
+    }
+    
     await saveBookmarks(updatedBookmarks);
   }, [bookmarks]);
 

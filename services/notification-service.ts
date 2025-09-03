@@ -72,7 +72,7 @@ class NotificationService {
           shouldShowAlert: true,
           shouldPlaySound: this.settings.reminderSound,
           shouldSetBadge: true,
-        }),
+        } as any),
       });
 
       // Load settings
@@ -190,9 +190,7 @@ class NotificationService {
                 prayerTime: prayerTime.toISOString(),
               },
             },
-            trigger: {
-              date: notificationTime,
-            },
+            trigger: { date: notificationTime } as any,
           });
 
           const scheduledNotification: ScheduledNotification = {
@@ -243,9 +241,10 @@ class NotificationService {
           },
         },
         trigger: {
-          date: reminderTime,
+          hour: hours,
+          minute: minutes,
           repeats: true,
-        },
+        } as any,
       });
 
       const scheduledNotification: ScheduledNotification = {
@@ -292,9 +291,10 @@ class NotificationService {
           },
         },
         trigger: {
-          date: reminderTime,
+          hour: hours,
+          minute: minutes,
           repeats: true,
-        },
+        } as any,
       });
 
       const scheduledNotification: ScheduledNotification = {
@@ -330,9 +330,7 @@ class NotificationService {
             ayahsCount,
           },
         },
-        trigger: {
-          date: reviewTime,
-        },
+        trigger: { date: reviewTime } as any,
       });
 
       const scheduledNotification: ScheduledNotification = {
@@ -366,9 +364,7 @@ class NotificationService {
             bookmarkTitle,
           },
         },
-        trigger: {
-          date: reminderTime,
-        },
+        trigger: { date: reminderTime } as any,
       });
 
       const scheduledNotification: ScheduledNotification = {
