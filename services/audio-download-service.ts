@@ -139,6 +139,17 @@ class AudioDownloadService {
       
       console.log(`Downloading: ${remoteUrl} -> ${localPath}`);
       
+      // Check if URL is accessible before attempting download
+      try {
+        const response = await fetch(remoteUrl, { method: 'HEAD' });
+        if (!response.ok) {
+          throw new Error(`Audio file not available: ${response.status}`);
+        }
+      } catch (fetchError) {
+        console.warn(`Audio file may not be available: ${remoteUrl}`);
+        // Continue with download attempt anyway
+      }
+      
       const downloadResumable = FileSystem.createDownloadResumable(
         remoteUrl,
         localPath,
@@ -401,36 +412,65 @@ class AudioDownloadService {
       return;
     }
     
-    // Download essential ayahs for default reciters
+    // Download essential ayahs for default reciters (expanded list)
     const essentialAyahs = [
       { surah: 1, ayah: 1 }, // Al-Fatihah opening
       { surah: 1, ayah: 2 }, // Al-Fatihah second ayah
+      { surah: 1, ayah: 3 }, // Al-Fatihah third ayah
+      { surah: 1, ayah: 4 }, // Al-Fatihah fourth ayah
+      { surah: 1, ayah: 5 }, // Al-Fatihah fifth ayah
+      { surah: 1, ayah: 6 }, // Al-Fatihah sixth ayah
       { surah: 1, ayah: 7 }, // Al-Fatihah last ayah
       { surah: 2, ayah: 255 }, // Ayat al-Kursi
+      { surah: 2, ayah: 286 }, // Last ayah of Al-Baqarah
       { surah: 112, ayah: 1 }, // Al-Ikhlas
       { surah: 112, ayah: 2 }, // Al-Ikhlas
       { surah: 112, ayah: 3 }, // Al-Ikhlas
       { surah: 112, ayah: 4 }, // Al-Ikhlas
       { surah: 113, ayah: 1 }, // Al-Falaq
+      { surah: 113, ayah: 2 }, // Al-Falaq
+      { surah: 113, ayah: 3 }, // Al-Falaq
+      { surah: 113, ayah: 4 }, // Al-Falaq
+      { surah: 113, ayah: 5 }, // Al-Falaq
       { surah: 114, ayah: 1 }, // An-Nas
+      { surah: 114, ayah: 2 }, // An-Nas
+      { surah: 114, ayah: 3 }, // An-Nas
+      { surah: 114, ayah: 4 }, // An-Nas
+      { surah: 114, ayah: 5 }, // An-Nas
+      { surah: 114, ayah: 6 }, // An-Nas
     ];
     
-    // Initialize default reciters in parallel for better performance
-    const initPromises = this.DEFAULT_RECITERS.map(async (reciterId) => {
-      console.log(`Initializing default reciter: ${reciterId}`);
+    // Initialize default reciters with better error handling and progress tracking
+    const initPromises = this.DEFAULT_RECITERS.map(async (reciterId, index) => {
+      console.log(`Initializing default reciter ${index + 1}/${this.DEFAULT_RECITERS.length}: ${reciterId}`);
       
+      let successCount = 0;
       const downloadPromises = essentialAyahs.map(async ({ surah, ayah }) => {
         try {
-          await this.downloadAyah(reciterId, surah, ayah);
+          const success = await this.downloadAyah(reciterId, surah, ayah);
+          if (success) successCount++;
+          return success;
         } catch (error) {
           console.error(`Failed to download essential ayah ${surah}:${ayah} for ${reciterId}:`, error);
+          return false;
         }
       });
       
-      await Promise.allSettled(downloadPromises);
+      const results = await Promise.allSettled(downloadPromises);
+      const actualSuccessCount = results.filter(r => r.status === 'fulfilled' && r.value).length;
+      
+      console.log(`Reciter ${reciterId} initialization: ${actualSuccessCount}/${essentialAyahs.length} ayahs downloaded`);
+      
+      // Mark reciter as partially initialized even if not all downloads succeeded
+      if (actualSuccessCount > 0) {
+        await this.updateReciterDownloadInfo(reciterId, 1); // Mark as having some content
+      }
     });
     
-    await Promise.allSettled(initPromises);
+    const initResults = await Promise.allSettled(initPromises);
+    const successfulInits = initResults.filter(r => r.status === 'fulfilled').length;
+    
+    console.log(`Default reciters initialization: ${successfulInits}/${this.DEFAULT_RECITERS.length} reciters processed`);
     
     // Mark as initialized
     await AsyncStorage.setItem('default_reciters_initialized', 'true');

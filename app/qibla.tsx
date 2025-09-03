@@ -74,8 +74,11 @@ export default function QiblaScreen() {
       longitude: location?.longitude || 0,
     },
     {
-      enabled: !!location,
-      retry: 2,
+      enabled: !!location && location.latitude !== 0 && location.longitude !== 0,
+      retry: 3,
+      retryDelay: 1000,
+      staleTime: 5 * 60 * 1000, // 5 minutes
+      gcTime: 30 * 60 * 1000, // 30 minutes (renamed from cacheTime in newer versions)
     }
   );
 
@@ -97,10 +100,15 @@ export default function QiblaScreen() {
 
   useEffect(() => {
     const initializeQibla = async () => {
-      await loadLocation();
-      // Ensure live mode is active by starting magnetometer immediately
-      if (compassEnabled) {
-        await startMagnetometer();
+      try {
+        await loadLocation();
+        // Ensure live mode is active by starting magnetometer immediately
+        if (compassEnabled && Platform.OS !== 'web') {
+          await startMagnetometer();
+        }
+      } catch (error) {
+        console.error('Error initializing Qibla:', error);
+        setError('Failed to initialize Qibla compass');
       }
     };
     
@@ -137,27 +145,41 @@ export default function QiblaScreen() {
         return;
       }
 
-      Magnetometer.setUpdateInterval(100); // Update every 100ms
+      // Improved update interval for better performance
+      Magnetometer.setUpdateInterval(200); // Update every 200ms for better battery life
       
       magnetometerSubscription.current = Magnetometer.addListener((data) => {
-        // Calculate heading from magnetometer data
-        const heading = Math.atan2(data.y, data.x) * (180 / Math.PI);
-        const normalizedHeading = (heading + 360) % 360;
-        
-        setDeviceHeading(normalizedHeading);
-        
-        // Auto-calibration detection
-        const magnitude = Math.sqrt(data.x * data.x + data.y * data.y + data.z * data.z);
-        if (magnitude > 25 && magnitude < 65) {
-          if (!isCalibrated) {
+        try {
+          // Enhanced heading calculation with smoothing
+          const heading = Math.atan2(data.y, data.x) * (180 / Math.PI);
+          const normalizedHeading = (heading + 360) % 360;
+          
+          // Apply simple smoothing to reduce jitter
+          setDeviceHeading(prevHeading => {
+            const diff = Math.abs(normalizedHeading - prevHeading);
+            if (diff > 180) {
+              // Handle wrap-around case
+              const adjustedDiff = 360 - diff;
+              return adjustedDiff < 5 ? prevHeading * 0.8 + normalizedHeading * 0.2 : normalizedHeading;
+            }
+            return diff < 5 ? prevHeading * 0.8 + normalizedHeading * 0.2 : normalizedHeading;
+          });
+          
+          // Enhanced auto-calibration detection
+          const magnitude = Math.sqrt(data.x * data.x + data.y * data.y + data.z * data.z);
+          const isGoodMagnitude = magnitude > 20 && magnitude < 80; // Wider range for better detection
+          
+          if (isGoodMagnitude && !isCalibrated) {
             setIsCalibrated(true);
             if (calibrationTimeout.current) {
               clearTimeout(calibrationTimeout.current);
             }
             calibrationTimeout.current = setTimeout(() => {
               setIsCalibrated(false);
-            }, 10000); // Reset calibration status after 10 seconds
+            }, 15000); // Longer calibration validity period
           }
+        } catch (error) {
+          console.error('Error processing magnetometer data:', error);
         }
       });
     } catch (error) {

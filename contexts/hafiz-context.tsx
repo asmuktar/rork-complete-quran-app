@@ -332,16 +332,31 @@ export const [HafizProvider, useHafiz] = createContextHook(() => {
 
   const generateTestQuestion = (surahId: number, ayahNumber: number, mode: 'recitation' | 'meaning' | 'sequence') => {
     const surah = getSurahById(surahId);
-    if (!surah) return null;
+    if (!surah) {
+      console.warn(`Surah ${surahId} not found`);
+      return null;
+    }
     
     const ayah = surah.verses.find(v => v.number === ayahNumber);
-    if (!ayah) return null;
+    if (!ayah) {
+      console.warn(`Ayah ${ayahNumber} not found in Surah ${surahId}`);
+      return null;
+    }
     
     switch (mode) {
       case 'recitation': {
-        // More sophisticated recitation testing
-        const words = ayah.text.split(' ');
-        const splitPoint = Math.floor(words.length * (0.3 + Math.random() * 0.4)); // 30-70% of the ayah
+        // More sophisticated recitation testing with better word handling
+        const words = ayah.text.trim().split(/\s+/).filter(word => word.length > 0);
+        if (words.length < 3) {
+          // For very short ayahs, test the whole ayah
+          return {
+            question: `Recite the complete ayah from Surah ${surah.name}:`,
+            correctAnswer: ayah.text,
+            options: undefined,
+          };
+        }
+        
+        const splitPoint = Math.max(1, Math.floor(words.length * (0.3 + Math.random() * 0.4))); // 30-70% of the ayah
         const questionPart = words.slice(0, splitPoint).join(' ');
         const answerPart = words.slice(splitPoint).join(' ');
         
@@ -353,7 +368,22 @@ export const [HafizProvider, useHafiz] = createContextHook(() => {
       }
       case 'meaning': {
         // Generate better distractors for meaning tests
-        const otherAyahs = surah.verses.filter(v => v.number !== ayahNumber && v.translation);
+        if (!ayah.translation) {
+          console.warn(`No translation available for ayah ${ayahNumber} in surah ${surahId}`);
+          return null;
+        }
+        
+        const otherAyahs = surah.verses.filter(v => v.number !== ayahNumber && v.translation && v.translation.length > 10);
+        
+        if (otherAyahs.length < 3) {
+          // Not enough distractors in same surah, use simple question
+          return {
+            question: `What is the meaning of this ayah from Surah ${surah.name}?\n\n"${ayah.text}"`,
+            correctAnswer: ayah.translation,
+            options: undefined,
+          };
+        }
+        
         const distractors = otherAyahs
           .sort(() => Math.random() - 0.5)
           .slice(0, 3)
@@ -450,9 +480,31 @@ export const [HafizProvider, useHafiz] = createContextHook(() => {
   };
 
   const submitTestAnswer = async (answer: string) => {
-    if (!currentTest) return;
+    if (!currentTest) {
+      console.warn('No current test to submit answer for');
+      return;
+    }
     
-    const isCorrect = answer.trim().toLowerCase() === currentTest.correctAnswer.trim().toLowerCase();
+    // Enhanced answer comparison with fuzzy matching
+    const normalizeText = (text: string) => {
+      return text.trim().toLowerCase()
+        .replace(/[\u064B-\u0652]/g, '') // Remove Arabic diacritics
+        .replace(/[^\u0600-\u06FF\u0750-\u077F\w\s]/g, '') // Keep only Arabic, alphanumeric, and spaces
+        .replace(/\s+/g, ' ');
+    };
+    
+    const userAnswer = normalizeText(answer);
+    const correctAnswer = normalizeText(currentTest.correctAnswer);
+    
+    // Check for exact match first
+    let isCorrect = userAnswer === correctAnswer;
+    
+    // If not exact match, check for partial match (80% similarity for Arabic text)
+    if (!isCorrect && currentTest.correctAnswer.length > 10) {
+      const similarity = calculateSimilarity(userAnswer, correctAnswer);
+      isCorrect = similarity > 0.8;
+    }
+    
     const timeSpent = Math.round((Date.now() - currentTest.startTime) / 1000);
     
     // Calculate confidence based on correctness, time, and test type
@@ -649,6 +701,46 @@ export const [HafizProvider, useHafiz] = createContextHook(() => {
       weeklyAyahs,
       completionRate: totalAyahs > 0 ? Math.round(((masteredAyahs + strongAyahs) / totalAyahs) * 100) : 0,
     };
+  };
+  
+  // Helper function for text similarity calculation
+  const calculateSimilarity = (str1: string, str2: string): number => {
+    const longer = str1.length > str2.length ? str1 : str2;
+    const shorter = str1.length > str2.length ? str2 : str1;
+    
+    if (longer.length === 0) return 1.0;
+    
+    const editDistance = levenshteinDistance(longer, shorter);
+    return (longer.length - editDistance) / longer.length;
+  };
+  
+  // Levenshtein distance calculation
+  const levenshteinDistance = (str1: string, str2: string): number => {
+    const matrix = [];
+    
+    for (let i = 0; i <= str2.length; i++) {
+      matrix[i] = [i];
+    }
+    
+    for (let j = 0; j <= str1.length; j++) {
+      matrix[0][j] = j;
+    }
+    
+    for (let i = 1; i <= str2.length; i++) {
+      for (let j = 1; j <= str1.length; j++) {
+        if (str2.charAt(i - 1) === str1.charAt(j - 1)) {
+          matrix[i][j] = matrix[i - 1][j - 1];
+        } else {
+          matrix[i][j] = Math.min(
+            matrix[i - 1][j - 1] + 1,
+            matrix[i][j - 1] + 1,
+            matrix[i - 1][j] + 1
+          );
+        }
+      }
+    }
+    
+    return matrix[str2.length][str1.length];
   };
 
   return {
