@@ -11,7 +11,7 @@ import { PersonalizationProvider } from "@/contexts/personalization-context";
 import notificationService from "@/services/notification-service";
 import offlineService from "@/services/offline-service";
 import cacheService from "@/services/cache-service";
-import resourceManager from "@/services/resource-manager";
+
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
@@ -33,10 +33,10 @@ function RootLayoutNav() {
       <Stack.Screen name="hadith-collections" options={{ title: "Hadith Collections" }} />
       <Stack.Screen name="hadith-collection/[id]" options={{ title: "Hadith Collection" }} />
       <Stack.Screen name="bookmarks" options={{ title: "Bookmarks" }} />
-      <Stack.Screen name="favorites" options={{ title: "Favorites" }} />
+
       <Stack.Screen name="settings" options={{ title: "Settings" }} />
       <Stack.Screen name="notification-settings" options={{ title: "Notifications" }} />
-      <Stack.Screen name="about" options={{ title: "About" }} />
+
       <Stack.Screen name="hafiz-dashboard" options={{ title: "Hafiz Dashboard" }} />
       <Stack.Screen name="performance" options={{ title: "Performance Monitor" }} />
     </Stack>

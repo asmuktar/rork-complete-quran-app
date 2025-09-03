@@ -66,20 +66,26 @@ class NotificationService {
     if (this.isInitialized) return;
 
     try {
-      // Configure notification behavior
-      Notifications.setNotificationHandler({
-        handleNotification: async () => ({
-          shouldShowAlert: true,
-          shouldPlaySound: this.settings.reminderSound,
-          shouldSetBadge: true,
-        } as any),
-      });
-
-      // Load settings
+      // Load settings first
       await this.loadSettings();
       
-      // Request permissions
-      await this.requestPermissions();
+      if (Platform.OS !== 'web') {
+        // Configure notification behavior
+        Notifications.setNotificationHandler({
+          handleNotification: async () => ({
+            shouldShowAlert: true,
+            shouldPlaySound: this.settings.reminderSound,
+            shouldSetBadge: true,
+            shouldShowBanner: true,
+            shouldShowList: true,
+          }),
+        });
+        
+        // Request permissions
+        await this.requestPermissions();
+      } else {
+        console.log('Notifications disabled on web platform');
+      }
 
       this.isInitialized = true;
       console.log('Notification service initialized');
@@ -190,7 +196,7 @@ class NotificationService {
                 prayerTime: prayerTime.toISOString(),
               },
             },
-            trigger: { date: notificationTime } as any,
+            trigger: notificationTime as any,
           });
 
           const scheduledNotification: ScheduledNotification = {
@@ -222,14 +228,6 @@ class NotificationService {
       await this.cancelNotificationsByType('study');
 
       const [hours, minutes] = this.settings.studyReminderTime.split(':').map(Number);
-      const now = new Date();
-      const reminderTime = new Date();
-      reminderTime.setHours(hours, minutes, 0, 0);
-
-      // If the time has passed today, schedule for tomorrow
-      if (reminderTime <= now) {
-        reminderTime.setDate(reminderTime.getDate() + 1);
-      }
 
       const notificationId = await Notifications.scheduleNotificationAsync({
         content: {
@@ -246,6 +244,9 @@ class NotificationService {
           repeats: true,
         } as any,
       });
+
+      const reminderTime = new Date();
+      reminderTime.setHours(hours, minutes, 0, 0);
 
       const scheduledNotification: ScheduledNotification = {
         id: notificationId,
@@ -272,14 +273,6 @@ class NotificationService {
       await this.cancelNotificationsByType('daily-verse');
 
       const [hours, minutes] = this.settings.dailyVerseTime.split(':').map(Number);
-      const now = new Date();
-      const reminderTime = new Date();
-      reminderTime.setHours(hours, minutes, 0, 0);
-
-      // If the time has passed today, schedule for tomorrow
-      if (reminderTime <= now) {
-        reminderTime.setDate(reminderTime.getDate() + 1);
-      }
 
       const notificationId = await Notifications.scheduleNotificationAsync({
         content: {
@@ -296,6 +289,9 @@ class NotificationService {
           repeats: true,
         } as any,
       });
+
+      const reminderTime = new Date();
+      reminderTime.setHours(hours, minutes, 0, 0);
 
       const scheduledNotification: ScheduledNotification = {
         id: notificationId,
@@ -330,7 +326,7 @@ class NotificationService {
             ayahsCount,
           },
         },
-        trigger: { date: reviewTime } as any,
+        trigger: reviewTime as any,
       });
 
       const scheduledNotification: ScheduledNotification = {
@@ -364,7 +360,7 @@ class NotificationService {
             bookmarkTitle,
           },
         },
-        trigger: { date: reminderTime } as any,
+        trigger: reminderTime as any,
       });
 
       const scheduledNotification: ScheduledNotification = {
@@ -406,6 +402,8 @@ class NotificationService {
   }
 
   async cancelNotificationsByType(type: ScheduledNotification['type']) {
+    if (Platform.OS === 'web') return;
+    
     try {
       const notificationsToCancel = this.scheduledNotifications.filter(n => n.type === type);
       
@@ -423,6 +421,8 @@ class NotificationService {
   }
 
   async cancelAllNotifications() {
+    if (Platform.OS === 'web') return;
+    
     try {
       await Notifications.cancelAllScheduledNotificationsAsync();
       this.scheduledNotifications = [];
