@@ -17,7 +17,7 @@ class CacheService {
   private memoryCache: Map<string, CacheEntry<any>> = new Map();
   private readonly DEFAULT_TTL = 30 * 60 * 1000; // 30 minutes
   private readonly DEFAULT_MAX_SIZE = 100;
-  private readonly CACHE_VERSION = '1.0.0';
+  private readonly CACHE_VERSION = '1.1.0'; // Updated for better compatibility
   private readonly STORAGE_PREFIX = 'cache_';
   private readonly METADATA_KEY = 'cache_metadata';
   
@@ -46,15 +46,26 @@ class CacheService {
       
       // Clear cache if version mismatch
       if (metadata.version !== this.CACHE_VERSION) {
-        console.log('Cache version mismatch, clearing cache');
+        console.log(`📦 Cache version mismatch (${metadata.version} → ${this.CACHE_VERSION}), clearing cache for compatibility`);
         await this.clearAll();
         await this.setCacheMetadata({ version: this.CACHE_VERSION, lastCleanup: Date.now() });
+        console.log('✅ Cache cleared and updated to new version');
+      } else {
+        console.log('📦 Cache version is current, no cleanup needed');
       }
       
       // Preload frequently accessed data into memory cache
       await this.preloadMemoryCache();
     } catch (error) {
       console.error('Error initializing cache:', error);
+      // Try to recover by clearing cache
+      try {
+        await this.clearAll();
+        await this.setCacheMetadata({ version: this.CACHE_VERSION, lastCleanup: Date.now() });
+        console.log('🔄 Cache recovered after error');
+      } catch (recoveryError) {
+        console.error('Failed to recover cache:', recoveryError);
+      }
     }
   }
 
@@ -83,13 +94,17 @@ class CacheService {
 
   private async cleanupExpiredEntries() {
     try {
-      console.log('Running cache cleanup...');
-      
       // Cleanup memory cache
+      let memoryCleanedCount = 0;
       for (const [key, entry] of this.memoryCache.entries()) {
         if (this.isExpired(entry)) {
           this.memoryCache.delete(key);
+          memoryCleanedCount++;
         }
+      }
+      
+      if (memoryCleanedCount > 0) {
+        console.log(`🧹 Cleaned ${memoryCleanedCount} expired entries from memory cache`);
       }
       
       // Cleanup persistent cache
@@ -130,7 +145,9 @@ class CacheService {
       
       if (expiredKeys.length > 0) {
         await AsyncStorage.multiRemove(expiredKeys);
-        console.log(`Cleaned up ${expiredKeys.length} expired cache entries`);
+        console.log(`🧹 Cleaned up ${expiredKeys.length} expired persistent cache entries`);
+      } else {
+        console.log('✅ No expired cache entries found');
       }
     } catch (error) {
       console.error('Error cleaning up persistent cache:', error);

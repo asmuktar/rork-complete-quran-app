@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Alert, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Bell, Clock, Volume2, Vibrate, Settings, Moon, Sun, BookOpen, Heart } from 'lucide-react-native';
+import { Bell, Clock, Volume2, Vibrate, Settings, Moon, Sun, BookOpen, Heart, AlertTriangle } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors } from '@/constants/colors';
 import notificationService, { NotificationSettings } from '@/services/notification-service';
 import { useHafiz } from '@/contexts/hafiz-context';
+import Constants from 'expo-constants';
+
+const isExpoGo = Constants.appOwnership === 'expo' || Constants.executionEnvironment === 'storeClient';
 
 export default function NotificationSettingsScreen() {
   const [settings, setSettings] = useState<NotificationSettings>(notificationService.getSettings());
@@ -122,6 +125,22 @@ export default function NotificationSettingsScreen() {
       </LinearGradient>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Expo Go Warning */}
+        {(Platform.OS !== 'web' && isExpoGo) && (
+          <View style={styles.warningCard}>
+            <View style={styles.warningHeader}>
+              <AlertTriangle size={20} color={Colors.warning} />
+              <Text style={styles.warningTitle}>Limited Functionality in Expo Go</Text>
+            </View>
+            <Text style={styles.warningText}>
+              Notifications are limited in Expo Go SDK 53+. For full notification functionality including scheduled reminders and push notifications, please use a development build.
+            </Text>
+            <Text style={styles.warningSubtext}>
+              Settings will be saved but notifications may not work as expected.
+            </Text>
+          </View>
+        )}
+
         {/* Prayer Reminders */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Prayer Reminders</Text>
@@ -306,6 +325,7 @@ export default function NotificationSettingsScreen() {
             • Adjust advance notice time based on your preparation needs{'\n'}
             • Use study reminders to build consistent learning habits{'\n'}
             • Hafiz reminders use spaced repetition for optimal memorization
+            {isExpoGo && '\n• For full notification support, use a development build instead of Expo Go'}
           </Text>
         </View>
 
@@ -543,5 +563,36 @@ const styles = StyleSheet.create({
     color: Colors.textLight,
     textAlign: 'center',
     fontWeight: '500',
+  },
+  warningCard: {
+    backgroundColor: 'rgba(255, 193, 7, 0.1)',
+    borderRadius: 16,
+    padding: 16,
+    marginTop: 20,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 193, 7, 0.3)',
+  },
+  warningHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
+  warningTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: Colors.warning,
+  },
+  warningText: {
+    fontSize: 14,
+    color: Colors.text,
+    lineHeight: 20,
+    marginBottom: 8,
+  },
+  warningSubtext: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+    fontStyle: 'italic',
   },
 });

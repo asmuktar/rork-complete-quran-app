@@ -3,8 +3,8 @@ import * as Notifications from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 
-// Check if we're in Expo Go
-const isExpoGo = Constants.appOwnership === 'expo';
+// Check if we're in Expo Go - notifications are limited in Expo Go SDK 53+
+const isExpoGo = Constants.appOwnership === 'expo' || Constants.executionEnvironment === 'storeClient';
 
 export interface NotificationSettings {
   prayerReminders: boolean;
@@ -87,24 +87,38 @@ class NotificationService {
         
         // Request permissions
         await this.requestPermissions();
+        console.log('Notification service initialized with full functionality');
       } else if (isExpoGo) {
-        console.log('Notifications limited in Expo Go - use development build for full functionality');
+        console.log('⚠️ Notifications are limited in Expo Go SDK 53+. Use a development build for full notification functionality.');
+        console.log('📱 Local notifications and scheduling are not available in Expo Go.');
       } else {
         console.log('Notifications disabled on web platform');
       }
 
       this.isInitialized = true;
-      console.log('Notification service initialized');
     } catch (error) {
       console.error('Failed to initialize notification service:', error);
+      // Don't throw error, just log it to prevent app crashes
+      this.isInitialized = true;
     }
   }
 
   async requestPermissions(): Promise<boolean> {
     try {
-      if (Platform.OS === 'web' || isExpoGo) {
-        console.log('Notifications not fully supported on web or Expo Go');
+      if (Platform.OS === 'web') {
+        console.log('Notifications not supported on web platform');
         return false;
+      }
+      
+      if (isExpoGo) {
+        console.log('⚠️ Push notifications require a development build. Expo Go SDK 53+ has limited notification support.');
+        // Still try to get permissions for basic functionality
+        try {
+          const { status } = await Notifications.getPermissionsAsync();
+          return status === 'granted';
+        } catch {
+          return false;
+        }
       }
 
       const { status: existingStatus } = await Notifications.getPermissionsAsync();
@@ -412,11 +426,14 @@ class NotificationService {
   }
 
   async sendImmediateNotification(title: string, body: string, data?: any) {
-    if (Platform.OS === 'web' || isExpoGo) {
-      console.log(`Notification: ${title} - ${body}`);
-      if (isExpoGo) {
-        console.log('Immediate notifications require development build - not available in Expo Go');
-      }
+    if (Platform.OS === 'web') {
+      console.log(`📱 Notification: ${title} - ${body}`);
+      return;
+    }
+    
+    if (isExpoGo) {
+      console.log(`📱 Notification (Expo Go): ${title} - ${body}`);
+      console.log('💡 Install a development build to receive actual notifications');
       return;
     }
 
