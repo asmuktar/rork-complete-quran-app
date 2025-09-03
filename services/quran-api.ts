@@ -1,3 +1,5 @@
+import cacheService from './cache-service';
+
 interface QuranApiResponse {
   data: {
     surahs: Array<{
@@ -48,9 +50,23 @@ class QuranApiService {
   private quranComUrl = 'https://api.quran.com/api/v4';
   
   async getSurah(surahNumber: number, edition: string = 'ar.alafasy'): Promise<any> {
+    const cacheKey = `${surahNumber}_${edition}`;
+    
+    // Check cache first
+    const cached = await cacheService.get('quran_ayahs', cacheKey);
+    if (cached) {
+      console.log(`Cache hit for surah ${surahNumber}`);
+      return cached;
+    }
+    
     try {
+      console.log(`Fetching surah ${surahNumber} from API`);
       const response = await fetch(`${this.baseUrl}/surah/${surahNumber}/${edition}`);
       const data = await response.json();
+      
+      // Cache the result
+      await cacheService.set('quran_ayahs', cacheKey, data.data);
+      
       return data.data;
     } catch (error) {
       console.error('Error fetching surah:', error);
@@ -59,9 +75,23 @@ class QuranApiService {
   }
 
   async getAyah(surahNumber: number, ayahNumber: number, edition: string = 'ar.alafasy'): Promise<any> {
+    const cacheKey = `${surahNumber}_${ayahNumber}_${edition}`;
+    
+    // Check cache first
+    const cached = await cacheService.get('quran_ayahs', cacheKey);
+    if (cached) {
+      console.log(`Cache hit for ayah ${surahNumber}:${ayahNumber}`);
+      return cached;
+    }
+    
     try {
+      console.log(`Fetching ayah ${surahNumber}:${ayahNumber} from API`);
       const response = await fetch(`${this.baseUrl}/ayah/${surahNumber}:${ayahNumber}/${edition}`);
       const data = await response.json();
+      
+      // Cache the result
+      await cacheService.set('quran_ayahs', cacheKey, data.data);
+      
       return data.data;
     } catch (error) {
       console.error('Error fetching ayah:', error);
@@ -70,9 +100,23 @@ class QuranApiService {
   }
 
   async searchQuran(query: string, edition: string = 'en.sahih'): Promise<any> {
+    const cacheKey = `${encodeURIComponent(query)}_${edition}`;
+    
+    // Check cache first
+    const cached = await cacheService.get('quran_search', cacheKey);
+    if (cached) {
+      console.log(`Cache hit for Quran search: ${query}`);
+      return cached;
+    }
+    
     try {
+      console.log(`Searching Quran for: ${query}`);
       const response = await fetch(`${this.baseUrl}/search/${encodeURIComponent(query)}/all/${edition}`);
       const data = await response.json();
+      
+      // Cache the result
+      await cacheService.set('quran_search', cacheKey, data.data);
+      
       return data.data;
     } catch (error) {
       console.error('Error searching Quran:', error);
@@ -81,9 +125,23 @@ class QuranApiService {
   }
 
   async getTranslation(surahNumber: number, ayahNumber: number, translationId: number = 131): Promise<any> {
+    const cacheKey = `${surahNumber}_${ayahNumber}_${translationId}`;
+    
+    // Check cache first
+    const cached = await cacheService.get('translations', cacheKey);
+    if (cached) {
+      console.log(`Cache hit for translation ${surahNumber}:${ayahNumber}`);
+      return cached;
+    }
+    
     try {
+      console.log(`Fetching translation ${surahNumber}:${ayahNumber}`);
       const response = await fetch(`${this.quranComUrl}/verses/by_key/${surahNumber}:${ayahNumber}?translations=${translationId}`);
       const data = await response.json();
+      
+      // Cache the result
+      await cacheService.set('translations', cacheKey, data.verse);
+      
       return data.verse;
     } catch (error) {
       console.error('Error fetching translation:', error);
@@ -127,9 +185,23 @@ class QuranApiService {
   }
 
   async getAllSurahs(): Promise<any> {
+    const cacheKey = 'all';
+    
+    // Check cache first
+    const cached = await cacheService.get('quran_surahs', cacheKey);
+    if (cached) {
+      console.log('Cache hit for all surahs');
+      return cached;
+    }
+    
     try {
+      console.log('Fetching all surahs from API');
       const response = await fetch(`${this.baseUrl}/surah`);
       const data = await response.json();
+      
+      // Cache the result
+      await cacheService.set('quran_surahs', cacheKey, data.data);
+      
       return data.data;
     } catch (error) {
       console.error('Error fetching all surahs:', error);
@@ -138,9 +210,23 @@ class QuranApiService {
   }
 
   async getJuz(juzNumber: number, edition: string = 'ar.alafasy'): Promise<any> {
+    const cacheKey = `${juzNumber}_${edition}`;
+    
+    // Check cache first
+    const cached = await cacheService.get('quran_ayahs', cacheKey);
+    if (cached) {
+      console.log(`Cache hit for juz ${juzNumber}`);
+      return cached;
+    }
+    
     try {
+      console.log(`Fetching juz ${juzNumber} from API`);
       const response = await fetch(`${this.baseUrl}/juz/${juzNumber}/${edition}`);
       const data = await response.json();
+      
+      // Cache the result
+      await cacheService.set('quran_ayahs', cacheKey, data.data);
+      
       return data.data;
     } catch (error) {
       console.error('Error fetching juz:', error);

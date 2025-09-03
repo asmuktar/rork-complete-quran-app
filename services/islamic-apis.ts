@@ -1,3 +1,5 @@
+import cacheService from './cache-service';
+
 interface PrayerTimesResponse {
   Fajr: string;
   Sunrise: string;
@@ -16,7 +18,17 @@ export async function getPrayerTimes(
   latitude: number,
   longitude: number
 ): Promise<PrayerTimesResponse> {
+  const cacheKey = `${latitude.toFixed(4)}_${longitude.toFixed(4)}_${new Date().toDateString()}`;
+  
+  // Check cache first
+  const cached = await cacheService.get<PrayerTimesResponse>('prayer_times', cacheKey);
+  if (cached) {
+    console.log('Cache hit for prayer times');
+    return cached;
+  }
+  
   try {
+    console.log('Fetching prayer times from API');
     const response = await fetch(
       `https://api.aladhan.com/v1/timings?latitude=${latitude}&longitude=${longitude}&method=2`
     );
@@ -26,7 +38,12 @@ export async function getPrayerTimes(
     }
     
     const data = await response.json();
-    return data.data.timings;
+    const prayerTimes = data.data.timings;
+    
+    // Cache the result
+    await cacheService.set('prayer_times', cacheKey, prayerTimes);
+    
+    return prayerTimes;
   } catch (error) {
     console.error('Error fetching prayer times:', error);
     throw new Error('Unable to fetch prayer times. Please check your internet connection.');
@@ -110,9 +127,19 @@ function calculateAccurateBearing(lat1: number, lng1: number, lat2: number, lng2
 }
 
 export async function getIslamicDate(): Promise<IslamicDateResponse> {
+  const today = new Date();
+  const dateString = today.toISOString().split('T')[0];
+  const cacheKey = dateString;
+  
+  // Check cache first
+  const cached = await cacheService.get<IslamicDateResponse>('islamic_calendar', cacheKey);
+  if (cached) {
+    console.log('Cache hit for Islamic date');
+    return cached;
+  }
+  
   try {
-    const today = new Date();
-    const dateString = today.toISOString().split('T')[0];
+    console.log('Fetching Islamic date from API');
     
     // Try multiple API endpoints for better reliability
     const apiUrls = [
@@ -150,10 +177,15 @@ export async function getIslamicDate(): Promise<IslamicDateResponse> {
         }
         
         if (hijriData) {
-          return {
+          const result = {
             hijri: `${hijriData.day} ${hijriData.month.en} ${hijriData.year} AH`,
             gregorian: dateString
           };
+          
+          // Cache the result
+          await cacheService.set('islamic_calendar', cacheKey, result);
+          
+          return result;
         }
       } catch (apiError) {
         console.log('API attempt failed:', apiError);
@@ -166,7 +198,6 @@ export async function getIslamicDate(): Promise<IslamicDateResponse> {
     console.error('Error fetching Islamic date:', error);
     
     // Enhanced fallback calculation
-    const today = new Date();
     const gregorianYear = today.getFullYear();
     
     // Approximate Hijri year calculation (rough estimate)
@@ -184,9 +215,14 @@ export async function getIslamicDate(): Promise<IslamicDateResponse> {
     const approximateHijriMonth = islamicMonths[currentMonth % 12];
     const approximateDay = Math.min(today.getDate(), 29); // Islamic months are 29-30 days
     
-    return {
+    const fallbackResult = {
       hijri: `${approximateDay} ${approximateHijriMonth} ${approximateHijriYear} AH (estimated)`,
       gregorian: today.toISOString().split('T')[0]
     };
+    
+    // Cache the fallback result with shorter TTL
+    await cacheService.set('islamic_calendar', cacheKey, fallbackResult);
+    
+    return fallbackResult;
   }
 }

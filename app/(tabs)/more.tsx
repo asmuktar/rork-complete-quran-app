@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Compass, Calendar, Settings, BookOpen, Users, Heart, Star, Info, MoreHorizontal } from 'lucide-react-native';
+import { Compass, Calendar, Settings, BookOpen, Users, Heart, Star, Info, MoreHorizontal, BarChart3 } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors } from '@/constants/colors';
@@ -55,6 +55,14 @@ const moreItems: MoreItem[] = [
     icon: Settings,
     route: '/settings',
     gradient: Colors.gradients.warm as [string, string]
+  },
+  {
+    id: 'performance',
+    title: 'Performance',
+    description: 'App performance and optimization',
+    icon: BarChart3,
+    route: '/performance',
+    gradient: Colors.gradients.ocean as [string, string]
   }
 ];
 

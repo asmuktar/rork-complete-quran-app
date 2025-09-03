@@ -1,6 +1,7 @@
 import * as FileSystem from 'expo-file-system';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
+import resourceManager from './resource-manager';
 
 export interface DownloadProgress {
   reciterId: string;
@@ -152,36 +153,43 @@ class AudioDownloadService {
     const downloadKey = `${reciterId}-${surahNumber}-${ayahNumber}`;
     
     if (Platform.OS === 'web') {
-      // On web, simulate download by caching the URL
-      try {
-        const remoteUrl = this.getAudioUrl(reciterId, surahNumber, ayahNumber);
-        
-        // Check if URL is accessible
-        const response = await fetch(remoteUrl, { method: 'HEAD' });
-        if (!response.ok) {
-          throw new Error(`Audio file not available: ${response.status}`);
+      // On web, simulate download by caching the URL with performance tracking
+      return resourceManager.trackApiCall(
+        `audio-cache-${reciterId}`,
+        async () => {
+          const remoteUrl = this.getAudioUrl(reciterId, surahNumber, ayahNumber);
+          
+          // Check if URL is accessible
+          const response = await fetch(remoteUrl, { method: 'HEAD' });
+          if (!response.ok) {
+            throw new Error(`Audio file not available: ${response.status}`);
+          }
+          
+          // Cache the URL
+          this.webAudioCache.set(downloadKey, remoteUrl);
+          
+          // Simulate progress
+          const progress: DownloadProgress = {
+            reciterId,
+            surahId: surahNumber,
+            progress: 1,
+            totalBytes: 1000, // Simulated size
+            downloadedBytes: 1000,
+            isComplete: true
+          };
+          
+          this.downloadQueue.set(downloadKey, progress);
+          this.notifyListeners(progress);
+          
+          console.log(`Web: Cached audio URL: ${downloadKey}`);
+          await this.updateReciterDownloadInfo(reciterId, surahNumber);
+          return true;
+        },
+        async () => {
+          // Check if already cached
+          return this.webAudioCache.has(downloadKey) ? true : null;
         }
-        
-        // Cache the URL
-        this.webAudioCache.set(downloadKey, remoteUrl);
-        
-        // Simulate progress
-        const progress: DownloadProgress = {
-          reciterId,
-          surahId: surahNumber,
-          progress: 1,
-          totalBytes: 1000, // Simulated size
-          downloadedBytes: 1000,
-          isComplete: true
-        };
-        
-        this.downloadQueue.set(downloadKey, progress);
-        this.notifyListeners(progress);
-        
-        console.log(`Web: Cached audio URL: ${downloadKey}`);
-        await this.updateReciterDownloadInfo(reciterId, surahNumber);
-        return true;
-      } catch (error) {
+      ).catch(error => {
         console.error(`Error caching ayah ${downloadKey}:`, error);
         
         const errorProgress: DownloadProgress = {
@@ -197,7 +205,7 @@ class AudioDownloadService {
         this.downloadQueue.set(downloadKey, errorProgress);
         this.notifyListeners(errorProgress);
         return false;
-      }
+      });
     }
     
     try {
@@ -288,27 +296,42 @@ class AudioDownloadService {
   async downloadSurah(reciterId: string, surahNumber: number, totalAyahs: number): Promise<boolean> {
     console.log(`Starting download of Surah ${surahNumber} for reciter ${reciterId} (${totalAyahs} ayahs)`);
     
-    let successCount = 0;
-    const downloadPromises: Promise<boolean>[] = [];
-    
-    for (let ayah = 1; ayah <= totalAyahs; ayah++) {
-      downloadPromises.push(this.downloadAyah(reciterId, surahNumber, ayah));
-    }
-    
-    const results = await Promise.allSettled(downloadPromises);
-    
-    results.forEach((result, index) => {
-      if (result.status === 'fulfilled' && result.value) {
-        successCount++;
-      } else {
-        console.error(`Failed to download ayah ${index + 1} of surah ${surahNumber}`);
+    return resourceManager.trackApiCall(
+      `surah-download-${reciterId}-${surahNumber}`,
+      async () => {
+        let successCount = 0;
+        const downloadPromises: Promise<boolean>[] = [];
+        
+        // Batch downloads in smaller chunks to avoid overwhelming the system
+        const BATCH_SIZE = 5;
+        for (let i = 0; i < totalAyahs; i += BATCH_SIZE) {
+          const batchPromises: Promise<boolean>[] = [];
+          
+          for (let ayah = i + 1; ayah <= Math.min(i + BATCH_SIZE, totalAyahs); ayah++) {
+            batchPromises.push(this.downloadAyah(reciterId, surahNumber, ayah));
+          }
+          
+          const batchResults = await Promise.allSettled(batchPromises);
+          batchResults.forEach((result, index) => {
+            if (result.status === 'fulfilled' && result.value) {
+              successCount++;
+            } else {
+              console.error(`Failed to download ayah ${i + index + 1} of surah ${surahNumber}`);
+            }
+          });
+          
+          // Small delay between batches to prevent overwhelming the server
+          if (i + BATCH_SIZE < totalAyahs) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+          }
+        }
+        
+        const isComplete = successCount === totalAyahs;
+        console.log(`Surah ${surahNumber} download complete: ${successCount}/${totalAyahs} ayahs`);
+        
+        return isComplete;
       }
-    });
-    
-    const isComplete = successCount === totalAyahs;
-    console.log(`Surah ${surahNumber} download complete: ${successCount}/${totalAyahs} ayahs`);
-    
-    return isComplete;
+    );
   }
 
   async downloadReciter(reciterId: string, surahsToDownload: number[] = []): Promise<void> {
@@ -505,12 +528,15 @@ class AudioDownloadService {
   async initializeDefaultReciters(): Promise<void> {
     console.log('Initializing default reciters...');
     
-    // Check if default reciters are already initialized
-    const stored = await AsyncStorage.getItem('default_reciters_initialized');
-    if (stored === 'true') {
-      console.log('Default reciters already initialized');
-      return;
-    }
+    return resourceManager.trackApiCall(
+      'initialize-default-reciters',
+      async () => {
+        // Check if default reciters are already initialized
+        const stored = await AsyncStorage.getItem('default_reciters_initialized');
+        if (stored === 'true') {
+          console.log('Default reciters already initialized');
+          return;
+        }
     
     // Download essential ayahs for default reciters (expanded list)
     const essentialAyahs = [
@@ -570,9 +596,11 @@ class AudioDownloadService {
     
     console.log(`Default reciters initialization: ${successfulInits}/${this.DEFAULT_RECITERS.length} reciters processed`);
     
-    // Mark as initialized
-    await AsyncStorage.setItem('default_reciters_initialized', 'true');
-    console.log('Default reciters initialization complete');
+        // Mark as initialized
+        await AsyncStorage.setItem('default_reciters_initialized', 'true');
+        console.log('Default reciters initialization complete');
+      }
+    );
   }
 }
 

@@ -10,6 +10,8 @@ import { BookmarkProvider } from "@/contexts/bookmark-context";
 import { PersonalizationProvider } from "@/contexts/personalization-context";
 import notificationService from "@/services/notification-service";
 import offlineService from "@/services/offline-service";
+import cacheService from "@/services/cache-service";
+import resourceManager from "@/services/resource-manager";
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
@@ -36,6 +38,7 @@ function RootLayoutNav() {
       <Stack.Screen name="notification-settings" options={{ title: "Notifications" }} />
       <Stack.Screen name="about" options={{ title: "About" }} />
       <Stack.Screen name="hafiz-dashboard" options={{ title: "Hafiz Dashboard" }} />
+      <Stack.Screen name="performance" options={{ title: "Performance Monitor" }} />
     </Stack>
   );
 }
@@ -44,6 +47,14 @@ export default function RootLayout() {
   useEffect(() => {
     const initializeApp = async () => {
       try {
+        // Initialize performance optimization services
+        console.log('Initializing performance optimization services...');
+        
+        // Preload essential cached data
+        cacheService.preloadEssentialData().catch(error => {
+          console.error('Failed to preload essential cache data:', error);
+        });
+        
         // Initialize default reciters in the background
         audioDownloadService.initializeDefaultReciters().catch(error => {
           console.error('Failed to initialize default reciters:', error);
@@ -58,6 +69,9 @@ export default function RootLayout() {
         offlineService.preloadEssentialData().catch(error => {
           console.error('Failed to preload essential data:', error);
         });
+        
+        // Start resource monitoring
+        console.log('Performance optimization services initialized');
         
         await SplashScreen.hideAsync();
       } catch (error) {
