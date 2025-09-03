@@ -48,30 +48,30 @@ export default function RootLayout() {
     const initializeApp = async () => {
       try {
         // Initialize performance optimization services
-        console.log('Initializing performance optimization services...');
+        console.log('🚀 Initializing performance optimization services...');
         
         // Preload essential cached data
         cacheService.preloadEssentialData().catch(error => {
-          console.error('Failed to preload essential cache data:', error);
+          console.error('❌ Failed to preload essential cache data:', error);
         });
         
         // Initialize default reciters in the background
         audioDownloadService.initializeDefaultReciters().catch(error => {
-          console.error('Failed to initialize default reciters:', error);
+          console.error('❌ Failed to initialize default reciters:', error);
         });
         
         // Initialize notification service
         notificationService.initialize().catch(error => {
-          console.error('Failed to initialize notification service:', error);
+          console.error('❌ Failed to initialize notification service:', error);
         });
         
         // Initialize offline service
         offlineService.preloadEssentialData().catch(error => {
-          console.error('Failed to preload essential data:', error);
+          console.error('❌ Failed to preload essential data:', error);
         });
         
         // Start resource monitoring
-        console.log('Performance optimization services initialized');
+        console.log('✅ Performance optimization services initialized');
         
         await SplashScreen.hideAsync();
       } catch (error) {

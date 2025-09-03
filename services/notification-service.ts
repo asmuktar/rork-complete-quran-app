@@ -87,11 +87,11 @@ class NotificationService {
         
         // Request permissions
         await this.requestPermissions();
-        // Notification service initialized with full functionality
+        console.log('✅ Notification service initialized with full functionality');
       } else if (isExpoGo) {
-        // Notifications are limited in Expo Go SDK 53+ - use development build for full functionality
+        console.log('ℹ️ Notifications are limited in Expo Go SDK 53+ - use development build for full functionality');
       } else {
-        // Notifications disabled on web platform
+        console.log('ℹ️ Notifications disabled on web platform');
       }
 
       this.isInitialized = true;
@@ -110,7 +110,7 @@ class NotificationService {
       }
       
       if (isExpoGo) {
-        // Push notifications require a development build - Expo Go SDK 53+ has limited notification support
+        console.log('ℹ️ Push notifications require a development build - Expo Go SDK 53+ has limited notification support');
         // Still try to get permissions for basic functionality
         try {
           const { status } = await Notifications.getPermissionsAsync();
@@ -129,7 +129,7 @@ class NotificationService {
       }
 
       if (finalStatus !== 'granted') {
-        // Notification permissions not granted
+        console.log('ℹ️ Notification permissions not granted');
         return false;
       }
 
@@ -189,7 +189,9 @@ class NotificationService {
     isha: Date;
   }) {
     if (!this.settings.prayerReminders || Platform.OS === 'web' || isExpoGo) {
-      // Prayer notifications require development build - not available in Expo Go
+      if (isExpoGo) {
+        console.log('ℹ️ Prayer notifications require development build - not available in Expo Go');
+      }
       return;
     }
 
@@ -236,7 +238,7 @@ class NotificationService {
       }
 
       await this.saveScheduledNotifications();
-      // Scheduled prayer notifications
+      console.log('✅ Scheduled prayer notifications');
     } catch (error) {
       console.error('Error scheduling prayer notifications:', error);
     }
@@ -244,7 +246,9 @@ class NotificationService {
 
   async scheduleStudyReminder() {
     if (!this.settings.studyReminders || Platform.OS === 'web' || isExpoGo) {
-      // Study reminders require development build - not available in Expo Go
+      if (isExpoGo) {
+        console.log('ℹ️ Study reminders require development build - not available in Expo Go');
+      }
       return;
     }
 
@@ -284,7 +288,7 @@ class NotificationService {
 
       this.scheduledNotifications.push(scheduledNotification);
       await this.saveScheduledNotifications();
-      // Scheduled daily study reminder
+      console.log('✅ Scheduled daily study reminder');
     } catch (error) {
       console.error('Error scheduling study reminder:', error);
     }
@@ -292,7 +296,9 @@ class NotificationService {
 
   async scheduleDailyVerseReminder() {
     if (!this.settings.dailyVerseReminder || Platform.OS === 'web' || isExpoGo) {
-      // Daily verse reminders require development build - not available in Expo Go
+      if (isExpoGo) {
+        console.log('ℹ️ Daily verse reminders require development build - not available in Expo Go');
+      }
       return;
     }
 
@@ -332,7 +338,7 @@ class NotificationService {
 
       this.scheduledNotifications.push(scheduledNotification);
       await this.saveScheduledNotifications();
-      // Scheduled daily verse reminder
+      console.log('✅ Scheduled daily verse reminder');
     } catch (error) {
       console.error('Error scheduling daily verse reminder:', error);
     }
@@ -340,7 +346,9 @@ class NotificationService {
 
   async scheduleHafizReviewReminder(ayahsCount: number, nextReviewTime?: Date) {
     if (Platform.OS === 'web' || isExpoGo) {
-      // Hafiz review reminders require development build - not available in Expo Go
+      if (isExpoGo) {
+        console.log('ℹ️ Hafiz review reminders require development build - not available in Expo Go');
+      }
       return;
     }
 
@@ -371,7 +379,7 @@ class NotificationService {
 
       this.scheduledNotifications.push(scheduledNotification);
       await this.saveScheduledNotifications();
-      // Scheduled hafiz review reminder
+      console.log('✅ Scheduled hafiz review reminder');
     } catch (error) {
       console.error('Error scheduling hafiz review reminder:', error);
     }
@@ -379,7 +387,9 @@ class NotificationService {
 
   async scheduleBookmarkReminder(bookmarkTitle: string, reminderTime: Date) {
     if (!this.settings.bookmarkReminders || Platform.OS === 'web' || isExpoGo) {
-      // Bookmark reminders require development build - not available in Expo Go
+      if (isExpoGo) {
+        console.log('ℹ️ Bookmark reminders require development build - not available in Expo Go');
+      }
       return;
     }
 
@@ -408,7 +418,7 @@ class NotificationService {
 
       this.scheduledNotifications.push(scheduledNotification);
       await this.saveScheduledNotifications();
-      // Scheduled bookmark reminder
+      console.log('✅ Scheduled bookmark reminder');
     } catch (error) {
       console.error('Error scheduling bookmark reminder:', error);
     }
@@ -416,12 +426,12 @@ class NotificationService {
 
   async sendImmediateNotification(title: string, body: string, data?: any) {
     if (Platform.OS === 'web') {
-      // Web notification: ${title} - ${body}
+      console.log(`ℹ️ Web notification: ${title} - ${body}`);
       return;
     }
     
     if (isExpoGo) {
-      // Expo Go notification: ${title} - ${body} (install development build for actual notifications)
+      console.log(`ℹ️ Expo Go notification: ${title} - ${body} (install development build for actual notifications)`);
       return;
     }
 
@@ -453,7 +463,7 @@ class NotificationService {
       this.scheduledNotifications = this.scheduledNotifications.filter(n => n.type !== type);
       await this.saveScheduledNotifications();
       
-      // Cancelled notifications of type: ${type}
+      console.log(`✅ Cancelled notifications of type: ${type}`);
     } catch (error) {
       console.error(`Error cancelling notifications of type ${type}:`, error);
     }
@@ -466,7 +476,7 @@ class NotificationService {
       await Notifications.cancelAllScheduledNotificationsAsync();
       this.scheduledNotifications = [];
       await this.saveScheduledNotifications();
-      // Cancelled all notifications
+      console.log('✅ Cancelled all notifications');
     } catch (error) {
       console.error('Error cancelling all notifications:', error);
     }
@@ -486,7 +496,7 @@ class NotificationService {
         await this.scheduleDailyVerseReminder();
       }
 
-      // Rescheduled all notifications
+      console.log('✅ Rescheduled all notifications');
     } catch (error) {
       console.error('Error rescheduling notifications:', error);
     }

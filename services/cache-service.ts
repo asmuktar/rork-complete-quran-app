@@ -46,8 +46,10 @@ class CacheService {
       
       // Clear cache if version mismatch
       if (metadata.version !== this.CACHE_VERSION) {
+        console.log(`📦 Cache version mismatch (${metadata.version} → ${this.CACHE_VERSION}), clearing cache for compatibility`);
         await this.clearAll();
         await this.setCacheMetadata({ version: this.CACHE_VERSION, lastCleanup: Date.now() });
+        console.log('✅ Cache cleared and updated to new version');
       }
       
       // Preload frequently accessed data into memory cache
@@ -58,7 +60,7 @@ class CacheService {
       try {
         await this.clearAll();
         await this.setCacheMetadata({ version: this.CACHE_VERSION, lastCleanup: Date.now() });
-        // Cache recovered after error
+        console.log('✅ Cache recovered after error');
       } catch (recoveryError) {
         console.error('Failed to recover cache:', recoveryError);
       }
@@ -347,7 +349,7 @@ class CacheService {
   // Preload commonly used data
   async preloadEssentialData(): Promise<void> {
     try {
-      // Preloading essential data
+      console.log('📦 Preloading essential data...');
       
       // This will be called by the app initialization
       // to preload commonly accessed data
@@ -359,8 +361,8 @@ class CacheService {
       // Check if data exists in cache, if not, it will be loaded on first access
       for (const { type, key } of essentialData) {
         await this.get(type, key);
-        // Essential data cached if available
       }
+      console.log('✅ Essential data preloading completed');
     } catch (error) {
       console.error('Error preloading essential data:', error);
     }
