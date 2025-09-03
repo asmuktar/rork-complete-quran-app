@@ -33,7 +33,8 @@ class AudioDownloadService {
   // Default reciters that come pre-loaded (only verified working ones)
   private readonly DEFAULT_RECITERS = [
     'mishary-alafasy',
-    'saad-al-ghamdi'
+    'saad-al-ghamdi',
+    'abdullah-basfar'
   ];
 
   constructor() {
@@ -56,41 +57,53 @@ class AudioDownloadService {
     }
   }
 
-  private getAudioUrl(reciterId: string, surahNumber: number, ayahNumber: number): string {
-    const paddedSurah = surahNumber.toString().padStart(3, '0');
-    const paddedAyah = ayahNumber.toString().padStart(3, '0');
-    
-    // Verified working reciters
+  private getReciterFolder(reciterId: string): string {
     const workingReciters: Record<string, string> = {
-      'almatroud': 'Almatroud_128kbps',
       'mishary-alafasy': 'Alafasy_128kbps',
-      'abdullah-basfar': 'Abdullah_Basfar_192kbps',
       'saad-al-ghamdi': 'Saad_Al-Ghamdi_128kbps',
+      'abdullah-basfar': 'Abdullah_Basfar_192kbps',
       'ali-al-hudhaify': 'Ali_Al-Hudhaify_128kbps',
       'abu-bakr-al-shatri': 'Abu_Bakr_Al-Shatri_128kbps',
       'ahmad-al-ajmi': 'Ahmad_Al-Ajmi_128kbps',
       'mohamed-siddiq-al-minshawi': 'Minshawi_Mujawwad_128kbps',
-      'mohamed-al-tablawi': 'Tablawi_128kbps'
+      'mohamed-al-tablawi': 'Tablawi_128kbps',
+      'abdur-rahman-sudais': 'Abdurrahman_As-Sudais_192kbps',
+      'maher-al-muaiqly': 'Maher_AlMuaiqly_128kbps'
     };
     
-    // Reciters that need fallback (known to have issues)
-    const fallbackReciters: Record<string, string> = {
-      'abdur-rahman-sudais': 'Alafasy_128kbps',
-      'maher-al-muaiqly': 'Alafasy_128kbps',
-      'aliyu-jabir': 'Alafasy_128kbps',
-      'bandar-baleela': 'Alafasy_128kbps',
-      'yasser-al-dosari': 'Alafasy_128kbps',
-      'khalid-al-jalil': 'Alafasy_128kbps',
-      'nasser-al-qatami': 'Alafasy_128kbps',
-      'fares-abbad': 'Alafasy_128kbps',
-      'salah-al-budair': 'Alafasy_128kbps',
-      'omar-al-kazabri': 'Alafasy_128kbps',
-      'idris-abkar': 'Alafasy_128kbps'
+    return workingReciters[reciterId] || 'Alafasy_128kbps';
+  }
+
+  private getAudioUrl(reciterId: string, surahNumber: number, ayahNumber: number): string {
+    const paddedSurah = surahNumber.toString().padStart(3, '0');
+    const paddedAyah = ayahNumber.toString().padStart(3, '0');
+    
+    // Verified working reciters with correct folder names
+    const workingReciters: Record<string, string> = {
+      'mishary-alafasy': 'Alafasy_128kbps',
+      'saad-al-ghamdi': 'Saad_Al-Ghamdi_128kbps',
+      'abdullah-basfar': 'Abdullah_Basfar_192kbps',
+      'ali-al-hudhaify': 'Ali_Al-Hudhaify_128kbps',
+      'abu-bakr-al-shatri': 'Abu_Bakr_Al-Shatri_128kbps',
+      'ahmad-al-ajmi': 'Ahmad_Al-Ajmi_128kbps',
+      'mohamed-siddiq-al-minshawi': 'Minshawi_Mujawwad_128kbps',
+      'mohamed-al-tablawi': 'Tablawi_128kbps',
+      'abdur-rahman-sudais': 'Abdurrahman_As-Sudais_192kbps',
+      'maher-al-muaiqly': 'Maher_AlMuaiqly_128kbps'
     };
     
-    // Use working reciter if available, otherwise use fallback
-    const reciterFolder = workingReciters[reciterId] || fallbackReciters[reciterId] || 'Alafasy_128kbps';
-    return `https://everyayah.com/data/${reciterFolder}/${paddedSurah}${paddedAyah}.mp3`;
+    // All other reciters fallback to Alafasy (most reliable)
+    const reciterFolder = workingReciters[reciterId] || 'Alafasy_128kbps';
+    
+    // Try multiple URL patterns for better compatibility
+    const baseUrls = [
+      `https://everyayah.com/data/${reciterFolder}/${paddedSurah}${paddedAyah}.mp3`,
+      `https://www.everyayah.com/data/${reciterFolder}/${paddedSurah}${paddedAyah}.mp3`,
+      `https://cdn.everyayah.com/data/${reciterFolder}/${paddedSurah}${paddedAyah}.mp3`
+    ];
+    
+    // Return the primary URL (we'll handle fallbacks in the download method)
+    return baseUrls[0];
   }
 
   private getLocalFilePath(reciterId: string, surahNumber: number, ayahNumber: number): string {
@@ -162,32 +175,50 @@ class AudioDownloadService {
       return resourceManager.trackApiCall(
         `audio-cache-${reciterId}`,
         async () => {
-          const remoteUrl = this.getAudioUrl(reciterId, surahNumber, ayahNumber);
+          // Try multiple URL patterns for web as well
+          const paddedSurah = surahNumber.toString().padStart(3, '0');
+          const paddedAyah = ayahNumber.toString().padStart(3, '0');
+          const reciterFolder = this.getReciterFolder(reciterId);
           
-          // Check if URL is accessible with timeout
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+          const possibleUrls = [
+            `https://everyayah.com/data/${reciterFolder}/${paddedSurah}${paddedAyah}.mp3`,
+            `https://www.everyayah.com/data/${reciterFolder}/${paddedSurah}${paddedAyah}.mp3`,
+            `https://cdn.everyayah.com/data/${reciterFolder}/${paddedSurah}${paddedAyah}.mp3`,
+            // Fallback to Alafasy if original reciter doesn't work
+            `https://everyayah.com/data/Alafasy_128kbps/${paddedSurah}${paddedAyah}.mp3`
+          ];
           
-          try {
-            const response = await fetch(remoteUrl, { 
-              method: 'HEAD',
-              signal: controller.signal
-            });
-            clearTimeout(timeoutId);
-            
-            if (!response.ok) {
-              throw new Error(`Audio file not available: ${response.status}`);
+          let workingUrl: string | null = null;
+          
+          // Test each URL to find a working one
+          for (const testUrl of possibleUrls) {
+            try {
+              const controller = new AbortController();
+              const timeoutId = setTimeout(() => controller.abort(), 3000); // Reduced timeout
+              
+              const response = await fetch(testUrl, { 
+                method: 'HEAD',
+                signal: controller.signal
+              });
+              clearTimeout(timeoutId);
+              
+              if (response.ok) {
+                workingUrl = testUrl;
+                console.log(`Web: Found working URL: ${testUrl}`);
+                break;
+              }
+            } catch {
+              // Continue to next URL
+              continue;
             }
-          } catch (error) {
-            clearTimeout(timeoutId);
-            if (error instanceof Error && error.name === 'AbortError') {
-              throw new Error('Audio file check timeout');
-            }
-            throw error;
           }
           
-          // Cache the URL
-          this.webAudioCache.set(downloadKey, remoteUrl);
+          if (!workingUrl) {
+            throw new Error(`No working audio URL found for ${reciterId} ${surahNumber}:${ayahNumber}`);
+          }
+          
+          // Cache the working URL
+          this.webAudioCache.set(downloadKey, workingUrl);
           
           // Simulate progress
           const progress: DownloadProgress = {
@@ -243,28 +274,53 @@ class AudioDownloadService {
       
       console.log(`Downloading: ${remoteUrl} -> ${localPath}`);
       
-      // Check if URL is accessible before attempting download
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000);
-        
-        const response = await fetch(remoteUrl, { 
-          method: 'HEAD',
-          signal: controller.signal
-        });
-        clearTimeout(timeoutId);
-        
-        if (!response.ok) {
-          throw new Error(`Audio file not available: ${response.status}`);
+      // Try multiple URL patterns for better compatibility
+      const paddedSurah = surahNumber.toString().padStart(3, '0');
+      const paddedAyah = ayahNumber.toString().padStart(3, '0');
+      const reciterFolder = this.getReciterFolder(reciterId);
+      
+      const possibleUrls = [
+        `https://everyayah.com/data/${reciterFolder}/${paddedSurah}${paddedAyah}.mp3`,
+        `https://www.everyayah.com/data/${reciterFolder}/${paddedSurah}${paddedAyah}.mp3`,
+        `https://cdn.everyayah.com/data/${reciterFolder}/${paddedSurah}${paddedAyah}.mp3`,
+        // Fallback to Alafasy if original reciter doesn't work
+        `https://everyayah.com/data/Alafasy_128kbps/${paddedSurah}${paddedAyah}.mp3`
+      ];
+      
+      let workingUrl = remoteUrl;
+      let urlFound = false;
+      
+      // Test each URL to find a working one
+      for (const testUrl of possibleUrls) {
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 3000); // Reduced timeout
+          
+          const response = await fetch(testUrl, { 
+            method: 'HEAD',
+            signal: controller.signal
+          });
+          clearTimeout(timeoutId);
+          
+          if (response.ok) {
+            workingUrl = testUrl;
+            urlFound = true;
+            console.log(`Found working URL: ${testUrl}`);
+            break;
+          }
+        } catch {
+          // Continue to next URL
+          continue;
         }
-      } catch (error) {
-        console.warn(`Audio file may not be available: ${remoteUrl}`, error);
-        // Don't continue with download if we know it will fail
-        throw new Error(`Audio file not accessible: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
+      
+      if (!urlFound) {
+        console.warn(`No working URL found for ${reciterId} ${surahNumber}:${ayahNumber}`);
+        // Still try the original URL as last resort
       }
       
       const downloadResumable = FileSystem.createDownloadResumable(
-        remoteUrl,
+        workingUrl,
         localPath,
         {},
         (downloadProgress) => {
