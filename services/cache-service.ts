@@ -46,12 +46,8 @@ class CacheService {
       
       // Clear cache if version mismatch
       if (metadata.version !== this.CACHE_VERSION) {
-        console.log(`📦 Cache version mismatch (${metadata.version} → ${this.CACHE_VERSION}), clearing cache for compatibility`);
         await this.clearAll();
         await this.setCacheMetadata({ version: this.CACHE_VERSION, lastCleanup: Date.now() });
-        console.log('✅ Cache cleared and updated to new version');
-      } else {
-        console.log('📦 Cache version is current, no cleanup needed');
       }
       
       // Preload frequently accessed data into memory cache
@@ -62,7 +58,7 @@ class CacheService {
       try {
         await this.clearAll();
         await this.setCacheMetadata({ version: this.CACHE_VERSION, lastCleanup: Date.now() });
-        console.log('🔄 Cache recovered after error');
+        // Cache recovered after error
       } catch (recoveryError) {
         console.error('Failed to recover cache:', recoveryError);
       }
@@ -95,16 +91,10 @@ class CacheService {
   private async cleanupExpiredEntries() {
     try {
       // Cleanup memory cache
-      let memoryCleanedCount = 0;
       for (const [key, entry] of this.memoryCache.entries()) {
         if (this.isExpired(entry)) {
           this.memoryCache.delete(key);
-          memoryCleanedCount++;
         }
-      }
-      
-      if (memoryCleanedCount > 0) {
-        console.log(`🧹 Cleaned ${memoryCleanedCount} expired entries from memory cache`);
       }
       
       // Cleanup persistent cache
@@ -145,9 +135,6 @@ class CacheService {
       
       if (expiredKeys.length > 0) {
         await AsyncStorage.multiRemove(expiredKeys);
-        console.log(`🧹 Cleaned up ${expiredKeys.length} expired persistent cache entries`);
-      } else {
-        console.log('✅ No expired cache entries found');
       }
     } catch (error) {
       console.error('Error cleaning up persistent cache:', error);
@@ -360,7 +347,7 @@ class CacheService {
   // Preload commonly used data
   async preloadEssentialData(): Promise<void> {
     try {
-      console.log('Preloading essential data...');
+      // Preloading essential data
       
       // This will be called by the app initialization
       // to preload commonly accessed data
@@ -371,10 +358,8 @@ class CacheService {
       
       // Check if data exists in cache, if not, it will be loaded on first access
       for (const { type, key } of essentialData) {
-        const cached = await this.get(type, key);
-        if (cached) {
-          console.log(`Essential data ${type}:${key} already cached`);
-        }
+        await this.get(type, key);
+        // Essential data cached if available
       }
     } catch (error) {
       console.error('Error preloading essential data:', error);
