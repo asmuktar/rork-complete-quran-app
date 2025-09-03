@@ -1176,7 +1176,7 @@ export default function SearchScreen() {
                 <Text style={styles.contextualTitle}>Context:</Text>
                 {result.contextualMatches.map((match, index) => (
                   <Text key={index} style={styles.contextualText}>
-                    "...{match}..."
+                    &quot;...{match}...&quot;
                   </Text>
                 ))}
               </View>

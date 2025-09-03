@@ -31,7 +31,7 @@ export default function HadithCollectionScreen() {
   const [hasMore, setHasMore] = useState<boolean>(true);
 
   const hadithsQuery = trpc.hadith.getHadiths.useQuery(
-    { collection: id || 'bukhari', page, limit: 10 },
+    { collection: id || 'bukhari', page, limit: 50 },
     {
       enabled: !!id,
     }

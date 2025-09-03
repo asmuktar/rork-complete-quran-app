@@ -220,9 +220,10 @@ export default function QiblaScreen() {
     if (!qiblaData) return null;
 
     // Calculate the qibla direction relative to device heading
+    // In live mode, the arrow should point to qibla relative to device orientation
     const qiblaDirection = compassEnabled ? 
-      (qiblaData.direction - deviceHeading + 360) % 360 : 
-      qiblaData.direction;
+      qiblaData.direction : // In live mode, use absolute qibla direction (compass rotates, arrow stays fixed to qibla)
+      qiblaData.direction;  // In static mode, show absolute direction
     
     return (
       <View style={styles.compassContainer}>
