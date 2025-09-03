@@ -51,38 +51,84 @@ export default function AdvancedHadithSearchScreen() {
       setIsLoading(true);
       setHasSearched(false);
       
+      // Validate input
+      if (!query || typeof query !== 'string' || query.trim().length === 0) {
+        console.warn('Invalid query provided to hadith search');
+        setSearchResults([]);
+        setIsLoading(false);
+        setHasSearched(true);
+        return;
+      }
+      
+      console.log('Searching hadiths for:', query.trim());
+      
       const results = await searchHadithsQuery.refetch();
       
-      if (results.data) {
+      if (results.data && Array.isArray(results.data)) {
+        console.log(`Received ${results.data.length} hadith results from API`);
+        
         // Filter by grade if specified
         let filteredResults = results.data;
-        if (filters.grade) {
-          filteredResults = results.data.filter(hadith => hadith.grade === filters.grade);
+        if (filters.grade && filters.grade.trim()) {
+          filteredResults = results.data.filter(hadith => 
+            hadith && hadith.grade && hadith.grade === filters.grade
+          );
+          console.log(`Filtered to ${filteredResults.length} results by grade: ${filters.grade}`);
         }
         
-        // Map to expected format
-        const mappedResults: HadithResult[] = filteredResults.map(hadith => ({
-          id: hadith.id,
-          arab: hadith.arab,
-          translation: hadith.translation,
-          narrator: hadith.narrator,
-          grade: hadith.grade,
-          collection: hadith.collection,
-          reference: `${hadith.book}, Hadith ${hadith.number}`
-        }));
+        // Map to expected format with null checks
+        const mappedResults: HadithResult[] = filteredResults
+          .filter(hadith => {
+            // Validate hadith structure
+            return hadith && 
+                   typeof hadith.id !== 'undefined' &&
+                   typeof hadith.arab === 'string' &&
+                   typeof hadith.translation === 'string' &&
+                   typeof hadith.narrator === 'string' &&
+                   typeof hadith.grade === 'string' &&
+                   typeof hadith.collection === 'string';
+          })
+          .map(hadith => {
+            try {
+              return {
+                id: hadith.id,
+                arab: hadith.arab || '',
+                translation: hadith.translation || '',
+                narrator: hadith.narrator || 'Unknown',
+                grade: hadith.grade || 'Unknown',
+                collection: hadith.collection || 'Unknown Collection',
+                reference: `${hadith.book || 'Unknown Book'}, Hadith ${hadith.number || 'N/A'}`
+              };
+            } catch (mappingError) {
+              console.error('Error mapping hadith result:', mappingError, hadith);
+              return null;
+            }
+          })
+          .filter((result): result is HadithResult => result !== null);
         
+        console.log(`Successfully mapped ${mappedResults.length} hadith results`);
         setSearchResults(mappedResults);
       } else {
+        console.log('No valid data received from hadith search API');
         setSearchResults([]);
       }
       
       setIsLoading(false);
       setHasSearched(true);
     } catch (error) {
-      console.error('Search error:', error);
-      setIsLoading(false);
-      setHasSearched(true);
-      Alert.alert('Search Error', 'Failed to search hadiths. Please try again.');
+      console.error('Hadith search error:', error);
+      
+      // Try fallback search with mock data
+      try {
+        console.log('Attempting fallback hadith search');
+        await searchHadithsLegacy(query, collection);
+      } catch (fallbackError) {
+        console.error('Fallback hadith search also failed:', fallbackError);
+        setSearchResults([]);
+        setIsLoading(false);
+        setHasSearched(true);
+        Alert.alert('Search Error', 'Failed to search hadiths. Please check your connection and try again.');
+      }
     }
   };
 
@@ -141,22 +187,52 @@ export default function AdvancedHadithSearchScreen() {
       setIsLoading(true);
       setHasSearched(false);
       
+      // Validate input
+      if (!query || typeof query !== 'string' || query.trim().length === 0) {
+        console.warn('Invalid query provided to legacy hadith search');
+        setSearchResults([]);
+        setIsLoading(false);
+        setHasSearched(true);
+        return;
+      }
+      
+      console.log('Using fallback hadith search for:', query.trim());
+      
       // Use mock data as fallback
       const allMockResults: HadithResult[] = getMockResults();
       
-      // Filter results based on query and collection
+      if (!Array.isArray(allMockResults) || allMockResults.length === 0) {
+        console.warn('No mock hadith data available');
+        setSearchResults([]);
+        setIsLoading(false);
+        setHasSearched(true);
+        return;
+      }
+      
+      // Filter results based on query and collection with enhanced null checks
       let filteredResults = allMockResults.filter(hadith => {
-        const matchesQuery = hadith.translation.toLowerCase().includes(query.toLowerCase()) ||
-                           hadith.arab.includes(query) ||
-                           hadith.narrator.toLowerCase().includes(query.toLowerCase());
+        if (!hadith) return false;
         
-        const matchesCollection = !filters.collection || 
-                                 hadith.collection.toLowerCase().includes(filters.collection.toLowerCase());
-        
-        const matchesGrade = !filters.grade || hadith.grade === filters.grade;
-        
-        return matchesQuery && matchesCollection && matchesGrade;
+        try {
+          const queryLower = query.toLowerCase().trim();
+          
+          const matchesQuery = (hadith.translation && hadith.translation.toLowerCase().includes(queryLower)) ||
+                             (hadith.arab && hadith.arab.includes(query)) ||
+                             (hadith.narrator && hadith.narrator.toLowerCase().includes(queryLower));
+          
+          const matchesCollection = !filters.collection || 
+                                   (hadith.collection && hadith.collection.toLowerCase().includes(filters.collection.toLowerCase()));
+          
+          const matchesGrade = !filters.grade || (hadith.grade && hadith.grade === filters.grade);
+          
+          return matchesQuery && matchesCollection && matchesGrade;
+        } catch (filterError) {
+          console.error('Error filtering hadith:', filterError, hadith);
+          return false;
+        }
       });
+      
+      console.log(`Filtered to ${filteredResults.length} hadith results from ${allMockResults.length} total`);
       
       // Simulate network delay
       await new Promise(resolve => setTimeout(resolve, 800));
@@ -165,7 +241,8 @@ export default function AdvancedHadithSearchScreen() {
       setIsLoading(false);
       setHasSearched(true);
     } catch (error) {
-      console.error('Search error:', error);
+      console.error('Legacy hadith search error:', error);
+      setSearchResults([]);
       setIsLoading(false);
       setHasSearched(true);
       Alert.alert('Search Error', 'Failed to search hadiths. Please try again.');
@@ -173,14 +250,22 @@ export default function AdvancedHadithSearchScreen() {
   };
 
   const handleSearch = () => {
-    if (!searchQuery.trim()) {
+    const trimmedQuery = searchQuery.trim();
+    
+    if (!trimmedQuery || trimmedQuery.length === 0) {
       Alert.alert('Input Required', 'Please enter a search term.');
       return;
     }
+    
+    if (trimmedQuery.length < 2) {
+      Alert.alert('Search Too Short', 'Please enter at least 2 characters to search.');
+      return;
+    }
 
+    console.log('Starting hadith search with query:', trimmedQuery);
     setIsLoading(true);
     setHasSearched(false);
-    searchHadiths(searchQuery.trim(), filters.collection || undefined);
+    searchHadiths(trimmedQuery, filters.collection || undefined);
   };
 
   const resetFilters = () => {

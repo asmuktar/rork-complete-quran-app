@@ -70,54 +70,147 @@ export default function SearchScreen() {
   
   // Advanced search algorithm similar to Shazam with AI-like ranking
   const enhanceSearchResults = useCallback(async (data: any[], query: string): Promise<SearchResult[]> => {
-    const results: SearchResult[] = await Promise.all(data.map(async (result: any) => {
-      const surahNumber = parseInt(result.verse_key.split(':')[0]);
-      const ayahNumber = parseInt(result.verse_key.split(':')[1]);
-      const surahInfo = SURAHS.find(s => s.id === surahNumber);
-      const reciter = getReciterById(selectedReciter);
+    if (!data || !Array.isArray(data) || data.length === 0) {
+      console.log('No data provided to enhanceSearchResults');
+      return [];
+    }
+
+    if (!query || typeof query !== 'string' || query.trim().length === 0) {
+      console.log('Invalid query provided to enhanceSearchResults');
+      return [];
+    }
+
+    const results: (SearchResult | null)[] = await Promise.all(data.map(async (result: any) => {
+      try {
+        // Validate result structure
+        if (!result || typeof result !== 'object') {
+          console.warn('Invalid result object:', result);
+          return null;
+        }
+
+        if (!result.verse_key || typeof result.verse_key !== 'string') {
+          console.warn('Missing or invalid verse_key:', result.verse_key);
+          return null;
+        }
+
+        const verseKeyParts = result.verse_key.split(':');
+        if (verseKeyParts.length !== 2) {
+          console.warn('Invalid verse_key format:', result.verse_key);
+          return null;
+        }
+
+        const surahNumber = parseInt(verseKeyParts[0]);
+        const ayahNumber = parseInt(verseKeyParts[1]);
+        
+        if (isNaN(surahNumber) || isNaN(ayahNumber) || surahNumber < 1 || ayahNumber < 1) {
+          console.warn('Invalid surah or ayah number:', { surahNumber, ayahNumber });
+          return null;
+        }
+
+        const surahInfo = SURAHS.find(s => s.id === surahNumber);
+        const reciter = getReciterById(selectedReciter);
       
-      // Calculate advanced relevance score using multiple AI-like factors
-      const relevanceScore = await calculateAdvancedRelevanceScore(result, query);
-      const matchType = determineAdvancedMatchType(result, query);
-      const confidence = calculateConfidenceScore(result, query);
-      const contextualMatches = findContextualMatches(result, query);
-      const popularityBoost = calculatePopularityBoost(result.verse_key);
+        // Calculate advanced relevance score using multiple AI-like factors
+        let relevanceScore = 0;
+        let matchType: 'exact' | 'partial' | 'phonetic' | 'semantic' | 'contextual' = 'contextual';
+        let confidence = 0;
+        let contextualMatches: string[] = [];
+        let popularityBoost = 0;
+        let isDownloaded = false;
+        let recitationQuality: 'high' | 'medium' | 'standard' = 'standard';
+
+        try {
+          relevanceScore = await calculateAdvancedRelevanceScore(result, query);
+        } catch (error) {
+          console.warn('Error calculating relevance score:', error);
+          relevanceScore = 10; // Default fallback score
+        }
+
+        try {
+          matchType = determineAdvancedMatchType(result, query);
+        } catch (error) {
+          console.warn('Error determining match type:', error);
+        }
+
+        try {
+          confidence = calculateConfidenceScore(result, query);
+        } catch (error) {
+          console.warn('Error calculating confidence score:', error);
+          confidence = 0.5; // Default fallback confidence
+        }
+
+        try {
+          contextualMatches = findContextualMatches(result, query);
+        } catch (error) {
+          console.warn('Error finding contextual matches:', error);
+        }
+
+        try {
+          popularityBoost = calculatePopularityBoost(result.verse_key);
+        } catch (error) {
+          console.warn('Error calculating popularity boost:', error);
+        }
+        
+        // Check if audio is downloaded locally
+        try {
+          isDownloaded = await audioDownloadService.isAudioAvailableLocally(selectedReciter, surahNumber, ayahNumber);
+        } catch (error) {
+          console.warn('Error checking audio availability:', error);
+        }
+        
+        // Generate audio URL for the specific ayah
+        let audioUrl = '';
+        try {
+          audioUrl = getAyahAudioUrl(surahNumber, ayahNumber, selectedReciter);
+        } catch (error) {
+          console.warn('Error generating audio URL:', error);
+        }
+        
+        // Determine recitation quality based on reciter
+        try {
+          recitationQuality = getRecitationQuality(selectedReciter);
+        } catch (error) {
+          console.warn('Error determining recitation quality:', error);
+        }
       
-      // Check if audio is downloaded locally
-      const isDownloaded = await audioDownloadService.isAudioAvailableLocally(selectedReciter, surahNumber, ayahNumber);
-      
-      // Generate audio URL for the specific ayah
-      const audioUrl = getAyahAudioUrl(surahNumber, ayahNumber, selectedReciter);
-      
-      // Determine recitation quality based on reciter
-      const recitationQuality = getRecitationQuality(selectedReciter);
-      
-      return {
-        id: `ayah-${result.verse_key}`,
-        type: 'ayah' as const,
-        title: `Surah ${surahInfo?.englishName || surahNumber} - Ayah ${ayahNumber}`,
-        subtitle: `${result.verse_key} • ${reciter?.name || 'Unknown Reciter'}`,
-        arabicText: result.text_uthmani,
-        translation: result.translations?.[0]?.text || '',
-        surahNumber,
-        ayahNumber,
-        surahName: surahInfo?.englishName,
-        reciterName: reciter?.name,
-        reciterId: selectedReciter,
-        audioUrl,
-        relevanceScore,
-        matchType,
-        verseKey: result.verse_key,
-        confidence,
-        isDownloaded,
-        contextualMatches,
-        popularityBoost,
-        recitationQuality,
-      };
+        return {
+          id: `ayah-${result.verse_key}`,
+          type: 'ayah' as const,
+          title: `Surah ${surahInfo?.englishName || `#${surahNumber}`} - Ayah ${ayahNumber}`,
+          subtitle: `${result.verse_key} • ${reciter?.name || 'Unknown Reciter'}`,
+          arabicText: result.text_uthmani || '',
+          translation: result.translations?.[0]?.text || result.translation || '',
+          surahNumber,
+          ayahNumber,
+          surahName: surahInfo?.englishName || `Surah ${surahNumber}`,
+          reciterName: reciter?.name || 'Unknown Reciter',
+          reciterId: selectedReciter,
+          audioUrl,
+          relevanceScore,
+          matchType,
+          verseKey: result.verse_key,
+          confidence,
+          isDownloaded,
+          contextualMatches,
+          popularityBoost,
+          recitationQuality,
+        };
+      } catch (error) {
+        console.error('Error processing search result:', error, result);
+        return null;
+      }
     }));
     
+    // Filter out null results from failed processing
+    const validResults: SearchResult[] = results.filter((result): result is SearchResult => result !== null);
+    
+    if (validResults.length === 0) {
+      console.warn('No valid results after processing');
+      return [];
+    }
+    
     // Advanced Shazam-like ranking algorithm
-    return results.sort((a, b) => {
+    return validResults.sort((a, b) => {
       // Primary sort by confidence and relevance
       const scoreA = (a.relevanceScore || 0) + (a.confidence || 0) * 50 + (a.popularityBoost || 0);
       const scoreB = (b.relevanceScore || 0) + (b.confidence || 0) * 50 + (b.popularityBoost || 0);
@@ -144,11 +237,19 @@ export default function SearchScreen() {
 
   // Advanced AI-like relevance scoring with multiple sophisticated factors
   const calculateAdvancedRelevanceScore = useCallback(async (result: any, query: string): Promise<number> => {
+    if (!result || !query) {
+      return 0;
+    }
+
     let score = 0;
     const queryLower = query.toLowerCase().trim();
     const arabicText = result.text_uthmani || '';
-    const translation = result.translations?.[0]?.text?.toLowerCase() || '';
-    const verseKey = result.verse_key;
+    const translation = (result.translations?.[0]?.text || result.translation || '').toLowerCase();
+    const verseKey = result.verse_key || '';
+
+    if (!queryLower || !translation) {
+      return 0;
+    }
     
     // 1. Exact phrase matching (Shazam-like precision)
     if (translation.includes(queryLower)) {
@@ -305,8 +406,16 @@ export default function SearchScreen() {
   
   // Calculate confidence score (0-1) based on match quality
   const calculateConfidenceScore = useCallback((result: any, query: string): number => {
-    const translation = result.translations?.[0]?.text?.toLowerCase() || '';
+    if (!result || !query) {
+      return 0;
+    }
+
+    const translation = (result.translations?.[0]?.text || result.translation || '').toLowerCase();
     const queryLower = query.toLowerCase();
+
+    if (!translation || !queryLower) {
+      return 0;
+    }
     
     // Exact match = high confidence
     if (translation.includes(queryLower)) {
@@ -332,9 +441,17 @@ export default function SearchScreen() {
   
   // Find contextual matches for better user understanding
   const findContextualMatches = useCallback((result: any, query: string): string[] => {
-    const translation = result.translations?.[0]?.text || '';
+    if (!result || !query) {
+      return [];
+    }
+
+    const translation = result.translations?.[0]?.text || result.translation || '';
     const queryLower = query.toLowerCase();
     const matches: string[] = [];
+
+    if (!translation || !queryLower) {
+      return [];
+    }
     
     // Find sentences or phrases that contain the query
     const sentences = translation.split(/[.!?]+/);
@@ -352,9 +469,17 @@ export default function SearchScreen() {
 
   // Advanced match type determination with contextual analysis
   const determineAdvancedMatchType = useCallback((result: any, query: string): 'exact' | 'partial' | 'phonetic' | 'semantic' | 'contextual' => {
-    const translation = result.translations?.[0]?.text?.toLowerCase() || '';
+    if (!result || !query) {
+      return 'contextual';
+    }
+
+    const translation = (result.translations?.[0]?.text || result.translation || '').toLowerCase();
     const queryLower = query.toLowerCase();
     const arabicText = result.text_uthmani || '';
+
+    if (!translation || !queryLower) {
+      return 'contextual';
+    }
     
     // Exact match in Arabic (highest priority)
     if (arabicText.includes(query)) {
@@ -466,13 +591,21 @@ export default function SearchScreen() {
 
   const searchMutation = trpc.quran.searchVerses.useMutation({
     onSuccess: async (data) => {
-      const enhancedResults = await enhanceSearchResults(data, searchQuery);
-      setSearchResults(enhancedResults);
-      setIsLoading(false);
-      
-      // Add to search history
-      if (searchQuery.trim() && !searchHistory.includes(searchQuery.toLowerCase())) {
-        setSearchHistory(prev => [searchQuery.toLowerCase(), ...prev.slice(0, 9)]); // Keep last 10 searches
+      try {
+        console.log('Search API response:', data);
+        const enhancedResults = await enhanceSearchResults(data || [], searchQuery);
+        setSearchResults(enhancedResults);
+        setIsLoading(false);
+        
+        // Add to search history
+        if (searchQuery && searchQuery.trim() && !searchHistory.includes(searchQuery.toLowerCase())) {
+          setSearchHistory(prev => [searchQuery.toLowerCase(), ...prev.slice(0, 9)]); // Keep last 10 searches
+        }
+      } catch (error) {
+        console.error('Error processing search results:', error);
+        setSearchResults([]);
+        setIsLoading(false);
+        Alert.alert('Search Error', 'Failed to process search results. Please try again.');
       }
     },
     onError: async (error) => {
@@ -480,17 +613,20 @@ export default function SearchScreen() {
       
       // Try offline search as fallback
       try {
-        const offlineResults = await offlineService.searchQuran(searchQuery);
-        if (offlineResults.matches && offlineResults.matches.length > 0) {
-          const enhancedResults = await enhanceSearchResults(offlineResults.matches, searchQuery);
-          setSearchResults(enhancedResults);
-          setIsLoading(false);
-          return;
+        if (searchQuery && searchQuery.trim()) {
+          const offlineResults = await offlineService.searchQuran(searchQuery.trim());
+          if (offlineResults && offlineResults.matches && Array.isArray(offlineResults.matches) && offlineResults.matches.length > 0) {
+            const enhancedResults = await enhanceSearchResults(offlineResults.matches, searchQuery);
+            setSearchResults(enhancedResults);
+            setIsLoading(false);
+            return;
+          }
         }
       } catch (offlineError) {
         console.error('Offline search error:', offlineError);
       }
       
+      setSearchResults([]);
       setIsLoading(false);
       Alert.alert(
         'Search Error', 
@@ -503,19 +639,30 @@ export default function SearchScreen() {
   
   const voiceSearchMutation = trpc.quran.voiceSearch.useMutation({
     onSuccess: async (data) => {
-      const enhancedResults = await enhanceSearchResults(data, searchQuery);
-      setSearchResults(enhancedResults);
-      setIsProcessing(false);
-      setHasSearched(true);
-      
-      // Add to search history
-      if (searchQuery.trim() && !searchHistory.includes(searchQuery.toLowerCase())) {
-        setSearchHistory(prev => [searchQuery.toLowerCase(), ...prev.slice(0, 9)]);
+      try {
+        console.log('Voice search API response:', data);
+        const enhancedResults = await enhanceSearchResults(data || [], searchQuery);
+        setSearchResults(enhancedResults);
+        setIsProcessing(false);
+        setHasSearched(true);
+        
+        // Add to search history
+        if (searchQuery && searchQuery.trim() && !searchHistory.includes(searchQuery.toLowerCase())) {
+          setSearchHistory(prev => [searchQuery.toLowerCase(), ...prev.slice(0, 9)]);
+        }
+      } catch (error) {
+        console.error('Error processing voice search results:', error);
+        setSearchResults([]);
+        setIsProcessing(false);
+        setHasSearched(true);
+        Alert.alert('Voice Search Error', 'Failed to process voice search results. Please try again.');
       }
     },
     onError: (error) => {
       console.error('Voice search error:', error);
+      setSearchResults([]);
       setIsProcessing(false);
+      setHasSearched(true);
       Alert.alert('Voice Search Error', 'Could not understand the audio. Please try again.');
     },
   });
@@ -613,29 +760,46 @@ export default function SearchScreen() {
     // Try offline search first if offline
     if (!isOnline) {
       try {
-        const offlineResults = await offlineService.searchQuran(query.trim());
-        if (offlineResults.matches && offlineResults.matches.length > 0) {
-          const enhancedResults = await enhanceSearchResults(offlineResults.matches, query);
-          setSearchResults(enhancedResults);
-          setIsLoading(false);
-          
-          // Add to search history
-          if (!searchHistory.includes(query.toLowerCase())) {
-            setSearchHistory(prev => [query.toLowerCase(), ...prev.slice(0, 9)]);
+        const trimmedQuery = query.trim();
+        if (trimmedQuery) {
+          const offlineResults = await offlineService.searchQuran(trimmedQuery);
+          if (offlineResults && offlineResults.matches && Array.isArray(offlineResults.matches) && offlineResults.matches.length > 0) {
+            const enhancedResults = await enhanceSearchResults(offlineResults.matches, query);
+            setSearchResults(enhancedResults);
+            setIsLoading(false);
+            
+            // Add to search history
+            if (!searchHistory.includes(query.toLowerCase())) {
+              setSearchHistory(prev => [query.toLowerCase(), ...prev.slice(0, 9)]);
+            }
+            return;
           }
-          return;
         }
       } catch (error) {
         console.error('Offline search error:', error);
       }
       
+      setSearchResults([]);
       setIsLoading(false);
       Alert.alert('Offline Search', 'No results found in offline data.');
       return;
     }
     
     // Use the backend API for online search
-    searchMutation.mutate({ query: query.trim() });
+    try {
+      const trimmedQuery = query.trim();
+      if (trimmedQuery) {
+        searchMutation.mutate({ query: trimmedQuery });
+      } else {
+        setSearchResults([]);
+        setIsLoading(false);
+      }
+    } catch (error) {
+      console.error('Error initiating search:', error);
+      setSearchResults([]);
+      setIsLoading(false);
+      Alert.alert('Search Error', 'Failed to initiate search. Please try again.');
+    }
   }, [searchMutation, isOnline, searchHistory, enhanceSearchResults]);
 
   const handleVoiceSearch = useCallback(async () => {
