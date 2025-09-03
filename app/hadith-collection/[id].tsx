@@ -41,16 +41,19 @@ export default function HadithCollectionScreen() {
   React.useEffect(() => {
     if (hadithsQuery.data) {
       if (page === 1) {
+        // Reset for first page
         setAllHadiths(hadithsQuery.data.hadiths);
       } else {
-        // Ensure we don't add duplicates and maintain sequential order
+        // Append new hadiths for subsequent pages
         setAllHadiths(prev => {
-          const existingIds = new Set(prev.map(h => h.id));
-          const newHadiths = hadithsQuery.data.hadiths.filter(h => !existingIds.has(h.id));
+          const existingNumbers = new Set(prev.map(h => h.number));
+          const newHadiths = hadithsQuery.data.hadiths.filter(h => !existingNumbers.has(h.number));
+          // Combine and sort by hadith number to maintain sequential order
           return [...prev, ...newHadiths].sort((a, b) => a.number - b.number);
         });
       }
       setHasMore(hadithsQuery.data.hasMore);
+      console.log(`Loaded page ${page}, total hadiths: ${page === 1 ? hadithsQuery.data.hadiths.length : allHadiths.length + hadithsQuery.data.hadiths.length}`);
     }
   }, [hadithsQuery.data, page]);
 

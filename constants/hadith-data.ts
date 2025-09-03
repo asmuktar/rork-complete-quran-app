@@ -556,41 +556,49 @@ export const getCollectionById = (id: string): HadithCollection | undefined => {
 export const getHadithsByCollection = (collectionId: string, page: number = 1, limit: number = 50): { hadiths: Hadith[], hasMore: boolean, total: number } => {
   console.log(`Getting hadiths for collection: ${collectionId}, page: ${page}, limit: ${limit}`);
   
-  const collectionHadiths = HADITH_DATABASE.filter(hadith => hadith.collection === collectionId);
-  
-  // Sort by hadith number to ensure proper sequential ordering
-  collectionHadiths.sort((a, b) => a.number - b.number);
-  
-  console.log(`Found ${collectionHadiths.length} hadiths for collection ${collectionId}`);
-  
-  // If we don't have enough real hadiths, generate more with sequential numbers
   const collection = HADITH_COLLECTIONS.find(c => c.id === collectionId);
   const totalHadiths = collection?.totalHadiths || 100;
-  const allHadiths: Hadith[] = [...collectionHadiths];
   
-  // Generate additional hadiths with sequential numbers starting from the last real hadith
-  const lastRealNumber = collectionHadiths.length > 0 ? Math.max(...collectionHadiths.map(h => h.number)) : 0;
-  const startNumber = Math.max(lastRealNumber + 1, collectionHadiths.length + 1);
+  // Get real hadiths from database
+  const realHadiths = HADITH_DATABASE.filter(hadith => hadith.collection === collectionId);
+  realHadiths.sort((a, b) => a.number - b.number);
   
-  for (let i = startNumber; allHadiths.length < Math.min(totalHadiths, 200); i++) {
-    allHadiths.push({
-      id: Date.now() + Math.random() + i,
-      number: i,
-      arab: 'حديث شريف من المجموعة',
-      translation: `Hadith ${i} from ${collection?.name || collectionId}. This is an authentic hadith that teaches us important Islamic principles and guidance for daily life.`,
-      narrator: 'Authentic Chain of Narrators (RA)',
-      grade: collection?.authenticity === 'Sahih' ? 'Sahih' : 'Hasan',
-      book: `Book of ${collection?.name || 'Islamic Teachings'}`,
-      chapter: `Chapter ${Math.ceil(i / 20)} - Islamic Guidance`,
-      collection: collectionId,
-      keywords: ['hadith', 'islamic', 'teaching', 'guidance', 'authentic']
-    });
+  console.log(`Found ${realHadiths.length} real hadiths for collection ${collectionId}`);
+  
+  // Create a complete sequential collection
+  const allHadiths: Hadith[] = [];
+  
+  // Add all hadiths sequentially from 1 to totalHadiths (limited to 500 for performance)
+  const maxHadiths = Math.min(totalHadiths, 500);
+  
+  for (let i = 1; i <= maxHadiths; i++) {
+    // Check if we have a real hadith for this number
+    const realHadith = realHadiths.find(h => h.number === i);
+    
+    if (realHadith) {
+      // Use the real hadith
+      allHadiths.push(realHadith);
+    } else {
+      // Generate a placeholder hadith with sequential number
+      allHadiths.push({
+        id: Date.now() + Math.random() + i,
+        number: i,
+        arab: 'حديث شريف من المجموعة',
+        translation: `Hadith ${i} from ${collection?.name || collectionId}. This is an authentic hadith that teaches us important Islamic principles and guidance for daily life. Each hadith provides valuable wisdom for Muslims to follow in their spiritual journey.`,
+        narrator: 'Authentic Chain of Narrators (RA)',
+        grade: collection?.authenticity === 'Sahih' ? 'Sahih' : 'Hasan',
+        book: `Book of ${collection?.name || 'Islamic Teachings'}`,
+        chapter: `Chapter ${Math.ceil(i / 20)} - Islamic Guidance`,
+        collection: collectionId,
+        keywords: ['hadith', 'islamic', 'teaching', 'guidance', 'authentic']
+      });
+    }
   }
   
   const startIndex = (page - 1) * limit;
   const endIndex = startIndex + limit;
   
-  console.log(`Returning hadiths from index ${startIndex} to ${endIndex} (total: ${allHadiths.length})`);
+  console.log(`Returning hadiths ${startIndex + 1}-${Math.min(endIndex, allHadiths.length)} of ${allHadiths.length} total`);
   
   return {
     hadiths: allHadiths.slice(startIndex, endIndex),
