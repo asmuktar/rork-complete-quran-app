@@ -25,8 +25,9 @@ export interface ReciterDownloadInfo {
 class AudioDownloadService {
   private downloadQueue: Map<string, DownloadProgress> = new Map();
   private listeners: ((progress: DownloadProgress) => void)[] = [];
-  private readonly AUDIO_DIR = `${FileSystem.documentDirectory}audio/`;
+  private readonly AUDIO_DIR = Platform.OS === 'web' ? 'audio/' : `${FileSystem.documentDirectory}audio/`;
   private readonly STORAGE_KEY = 'downloaded_reciters';
+  private webAudioCache: Map<string, string> = new Map(); // For web audio URLs
   
   // Default reciters that come pre-loaded
   private readonly DEFAULT_RECITERS = [
@@ -40,6 +41,11 @@ class AudioDownloadService {
   }
 
   private async initializeAudioDirectory() {
+    if (Platform.OS === 'web') {
+      // Web doesn't need directory initialization
+      return;
+    }
+    
     try {
       const dirInfo = await FileSystem.getInfoAsync(this.AUDIO_DIR);
       if (!dirInfo.exists) {
@@ -88,6 +94,11 @@ class AudioDownloadService {
   }
 
   private async ensureReciterDirectory(reciterId: string) {
+    if (Platform.OS === 'web') {
+      // Web doesn't need directory creation
+      return;
+    }
+    
     const reciterDir = `${this.AUDIO_DIR}${reciterId}/`;
     const dirInfo = await FileSystem.getInfoAsync(reciterDir);
     if (!dirInfo.exists) {
@@ -96,6 +107,12 @@ class AudioDownloadService {
   }
 
   async isAudioAvailableLocally(reciterId: string, surahNumber: number, ayahNumber: number): Promise<boolean> {
+    if (Platform.OS === 'web') {
+      // On web, check if we have cached the URL
+      const cacheKey = `${reciterId}-${surahNumber}-${ayahNumber}`;
+      return this.webAudioCache.has(cacheKey);
+    }
+    
     try {
       const localPath = this.getLocalFilePath(reciterId, surahNumber, ayahNumber);
       const fileInfo = await FileSystem.getInfoAsync(localPath);
@@ -107,6 +124,15 @@ class AudioDownloadService {
   }
 
   async getAudioUri(reciterId: string, surahNumber: number, ayahNumber: number): Promise<string> {
+    if (Platform.OS === 'web') {
+      // On web, always use online URLs
+      const onlineUrl = this.getAudioUrl(reciterId, surahNumber, ayahNumber);
+      const cacheKey = `${reciterId}-${surahNumber}-${ayahNumber}`;
+      this.webAudioCache.set(cacheKey, onlineUrl);
+      console.log(`Using online audio (web): ${onlineUrl}`);
+      return onlineUrl;
+    }
+    
     // Check if available locally first
     const isLocal = await this.isAudioAvailableLocally(reciterId, surahNumber, ayahNumber);
     
@@ -123,9 +149,58 @@ class AudioDownloadService {
   }
 
   async downloadAyah(reciterId: string, surahNumber: number, ayahNumber: number): Promise<boolean> {
+    const downloadKey = `${reciterId}-${surahNumber}-${ayahNumber}`;
+    
+    if (Platform.OS === 'web') {
+      // On web, simulate download by caching the URL
+      try {
+        const remoteUrl = this.getAudioUrl(reciterId, surahNumber, ayahNumber);
+        
+        // Check if URL is accessible
+        const response = await fetch(remoteUrl, { method: 'HEAD' });
+        if (!response.ok) {
+          throw new Error(`Audio file not available: ${response.status}`);
+        }
+        
+        // Cache the URL
+        this.webAudioCache.set(downloadKey, remoteUrl);
+        
+        // Simulate progress
+        const progress: DownloadProgress = {
+          reciterId,
+          surahId: surahNumber,
+          progress: 1,
+          totalBytes: 1000, // Simulated size
+          downloadedBytes: 1000,
+          isComplete: true
+        };
+        
+        this.downloadQueue.set(downloadKey, progress);
+        this.notifyListeners(progress);
+        
+        console.log(`Web: Cached audio URL: ${downloadKey}`);
+        await this.updateReciterDownloadInfo(reciterId, surahNumber);
+        return true;
+      } catch (error) {
+        console.error(`Error caching ayah ${downloadKey}:`, error);
+        
+        const errorProgress: DownloadProgress = {
+          reciterId,
+          surahId: surahNumber,
+          progress: 0,
+          totalBytes: 0,
+          downloadedBytes: 0,
+          isComplete: false,
+          error: error instanceof Error ? error.message : 'Caching failed'
+        };
+        
+        this.downloadQueue.set(downloadKey, errorProgress);
+        this.notifyListeners(errorProgress);
+        return false;
+      }
+    }
+    
     try {
-      const downloadKey = `${reciterId}-${surahNumber}-${ayahNumber}`;
-      
       // Check if already downloaded
       if (await this.isAudioAvailableLocally(reciterId, surahNumber, ayahNumber)) {
         console.log(`Audio already downloaded: ${downloadKey}`);
@@ -145,7 +220,7 @@ class AudioDownloadService {
         if (!response.ok) {
           throw new Error(`Audio file not available: ${response.status}`);
         }
-      } catch (fetchError) {
+      } catch {
         console.warn(`Audio file may not be available: ${remoteUrl}`);
         // Continue with download attempt anyway
       }
@@ -203,7 +278,6 @@ class AudioDownloadService {
         error: error instanceof Error ? error.message : 'Download failed'
       };
       
-      const downloadKey = `${reciterId}-${surahNumber}-${ayahNumber}`;
       this.downloadQueue.set(downloadKey, errorProgress);
       this.notifyListeners(errorProgress);
       
@@ -308,6 +382,27 @@ class AudioDownloadService {
 
   async deleteReciterAudio(reciterId: string): Promise<boolean> {
     try {
+      if (Platform.OS === 'web') {
+        // On web, clear cached URLs for this reciter
+        const keysToDelete: string[] = [];
+        this.webAudioCache.forEach((_, key) => {
+          if (key.startsWith(`${reciterId}-`)) {
+            keysToDelete.push(key);
+          }
+        });
+        
+        keysToDelete.forEach(key => this.webAudioCache.delete(key));
+        
+        // Update storage
+        const stored = await AsyncStorage.getItem(this.STORAGE_KEY);
+        const downloadedReciters: Record<string, ReciterDownloadInfo> = stored ? JSON.parse(stored) : {};
+        delete downloadedReciters[reciterId];
+        await AsyncStorage.setItem(this.STORAGE_KEY, JSON.stringify(downloadedReciters));
+        
+        console.log(`Web: Cleared cached audio for reciter: ${reciterId}`);
+        return true;
+      }
+      
       const reciterDir = `${this.AUDIO_DIR}${reciterId}/`;
       const dirInfo = await FileSystem.getInfoAsync(reciterDir);
       
@@ -356,6 +451,11 @@ class AudioDownloadService {
   }
 
   private async getAudioDirectorySize(): Promise<number> {
+    if (Platform.OS === 'web') {
+      // On web, return estimated size based on cached items
+      return this.webAudioCache.size * 1000; // Rough estimate
+    }
+    
     try {
       const dirInfo = await FileSystem.getInfoAsync(this.AUDIO_DIR);
       if (!dirInfo.exists) return 0;
@@ -444,11 +544,9 @@ class AudioDownloadService {
     const initPromises = this.DEFAULT_RECITERS.map(async (reciterId, index) => {
       console.log(`Initializing default reciter ${index + 1}/${this.DEFAULT_RECITERS.length}: ${reciterId}`);
       
-      let successCount = 0;
       const downloadPromises = essentialAyahs.map(async ({ surah, ayah }) => {
         try {
           const success = await this.downloadAyah(reciterId, surah, ayah);
-          if (success) successCount++;
           return success;
         } catch (error) {
           console.error(`Failed to download essential ayah ${surah}:${ayah} for ${reciterId}:`, error);
