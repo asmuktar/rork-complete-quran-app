@@ -222,7 +222,7 @@ export default function QiblaScreen() {
     // Calculate the qibla direction relative to device heading
     // In live mode, the arrow should point to qibla relative to device orientation
     const qiblaDirection = compassEnabled ? 
-      qiblaData.direction : // In live mode, use absolute qibla direction (compass rotates, arrow stays fixed to qibla)
+      qiblaData.direction - deviceHeading : // In live mode, adjust for device rotation
       qiblaData.direction;  // In static mode, show absolute direction
     
     return (
@@ -347,80 +347,77 @@ export default function QiblaScreen() {
         end={{ x: 1, y: 1 }}
       >
         <View style={styles.headerContent}>
-          <Compass size={32} color={Colors.textOnPrimary} />
+          <Compass size={24} color={Colors.textOnPrimary} />
           <Text style={styles.title}>Qibla Direction</Text>
           <Text style={styles.subtitle}>Direction to Kaaba, Mecca</Text>
         </View>
       </LinearGradient>
 
-      <View style={styles.content}>
-        {loading && (
-          <View style={styles.loadingContainer}>
-            <RefreshCw size={48} color={Colors.primary} />
-            <Text style={styles.loadingText}>Finding your location...</Text>
-            <Text style={styles.loadingSubtext}>Please wait while we calculate the Qibla direction</Text>
-          </View>
-        )}
+      {loading && (
+        <View style={styles.loadingContainer}>
+          <RefreshCw size={48} color={Colors.primary} />
+          <Text style={styles.loadingText}>Finding your location...</Text>
+          <Text style={styles.loadingSubtext}>Please wait while we calculate the Qibla direction</Text>
+        </View>
+      )}
 
-        {error && !loading && (
-          <View style={styles.errorContainer}>
-            <View style={styles.errorIcon}>
-              <MapPin size={48} color={Colors.error} />
-            </View>
-            <Text style={styles.errorTitle}>Location Error</Text>
-            <Text style={styles.errorText}>{error}</Text>
-            <TouchableOpacity style={styles.retryButton} onPress={loadLocation}>
+      {error && !loading && (
+        <View style={styles.errorContainer}>
+          <View style={styles.errorIcon}>
+            <MapPin size={48} color={Colors.error} />
+          </View>
+          <Text style={styles.errorTitle}>Location Error</Text>
+          <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={loadLocation}>
+            <LinearGradient
+              colors={Colors.gradients.primary as [string, string]}
+              style={styles.retryGradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+            >
+              <RefreshCw size={20} color={Colors.textOnPrimary} />
+              <Text style={styles.retryText}>Try Again</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {qiblaData && location && !loading && (
+        <View style={styles.content}>
+          {/* Compass */}
+          {renderCompass()}
+
+          {/* Direction Info Grid */}
+          <View style={styles.infoGrid}>
+            <View style={styles.infoCard}>
               <LinearGradient
-                colors={Colors.gradients.primary as [string, string]}
-                style={styles.retryGradient}
+                colors={Colors.gradients.secondary as [string, string]}
+                style={styles.infoGradient}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
               >
-                <RefreshCw size={20} color={Colors.textOnPrimary} />
-                <Text style={styles.retryText}>Try Again</Text>
+                <Text style={styles.infoTitle}>Qibla Direction</Text>
+                <Text style={styles.infoValue}>
+                  {Math.round(qiblaData.direction)}° {formatDirection(qiblaData.direction)}
+                </Text>
               </LinearGradient>
-            </TouchableOpacity>
-          </View>
-        )}
+            </View>
 
-        {qiblaData && location && !loading && (
-          <>
-            {/* Compass */}
-            {renderCompass()}
-
-            {/* Direction Info */}
-            <View style={styles.infoContainer}>
-              <View style={styles.infoCard}>
-                <LinearGradient
-                  colors={Colors.gradients.secondary as [string, string]}
-                  style={styles.infoGradient}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                >
-                  <Text style={styles.infoTitle}>Qibla Direction</Text>
-                  <Text style={styles.infoValue}>
-                    {Math.round(qiblaData.direction)}° {formatDirection(qiblaData.direction)}
-                  </Text>
-                </LinearGradient>
-              </View>
-
-              <View style={styles.infoCard}>
-                <LinearGradient
-                  colors={Colors.gradients.accent as [string, string]}
-                  style={styles.infoGradient}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                >
-                  <Text style={styles.infoTitle}>Distance to Kaaba</Text>
-                  <Text style={styles.infoValue}>{formatDistance(qiblaData.distance)}</Text>
-                </LinearGradient>
-              </View>
+            <View style={styles.infoCard}>
+              <LinearGradient
+                colors={Colors.gradients.accent as [string, string]}
+                style={styles.infoGradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+              >
+                <Text style={styles.infoTitle}>Distance to Kaaba</Text>
+                <Text style={styles.infoValue}>{formatDistance(qiblaData.distance)}</Text>
+              </LinearGradient>
             </View>
             
-            {/* Device heading info */}
             {compassEnabled && (
-              <View style={styles.deviceInfoContainer}>
-                <View style={styles.deviceInfoCard}>
+              <>
+                <View style={styles.infoCard}>
                   <LinearGradient
                     colors={['#4A90E2', '#357ABD']}
                     style={styles.infoGradient}
@@ -434,7 +431,7 @@ export default function QiblaScreen() {
                   </LinearGradient>
                 </View>
                 
-                <View style={styles.deviceInfoCard}>
+                <View style={styles.infoCard}>
                   <LinearGradient
                     colors={isCalibrated ? ['#4CAF50', '#45A049'] : ['#FF9800', '#F57C00']}
                     style={styles.infoGradient}
@@ -447,61 +444,25 @@ export default function QiblaScreen() {
                     </Text>
                   </LinearGradient>
                 </View>
-              </View>
+              </>
             )}
+          </View>
 
-            {/* Location Info */}
-            <View style={styles.locationContainer}>
-              <View style={styles.locationHeader}>
-                <MapPin size={20} color={Colors.primary} />
-                <Text style={styles.locationTitle}>Your Location</Text>
-              </View>
-              <Text style={styles.locationText}>
-                {location.address || `${location.latitude.toFixed(4)}, ${location.longitude.toFixed(4)}`}
-              </Text>
-              <Text style={styles.coordinatesText}>
-                Lat: {location.latitude.toFixed(6)}, Lng: {location.longitude.toFixed(6)}
-              </Text>
+          {/* Location Info */}
+          <View style={styles.locationContainer}>
+            <View style={styles.locationHeader}>
+              <MapPin size={16} color={Colors.primary} />
+              <Text style={styles.locationTitle}>Your Location</Text>
             </View>
-
-            {/* Instructions */}
-            <View style={styles.instructionsContainer}>
-              <Text style={styles.instructionsTitle}>How to Use</Text>
-              {compassEnabled ? (
-                <>
-                  <Text style={styles.instructionsText}>
-                    • Hold your device flat in landscape orientation
-                  </Text>
-                  <Text style={styles.instructionsText}>
-                    • The golden arrow automatically points toward the Kaaba
-                  </Text>
-                  <Text style={styles.instructionsText}>
-                    • The compass rotates with your device movement
-                  </Text>
-                  <Text style={styles.instructionsText}>
-                    • Calibrate compass if the status shows &quot;Needs Calibration&quot;
-                  </Text>
-                  <Text style={styles.instructionsText}>
-                    • Keep away from metal objects for best accuracy
-                  </Text>
-                </>
-              ) : (
-                <>
-                  <Text style={styles.instructionsText}>
-                    • Point your device in the direction shown by the golden arrow
-                  </Text>
-                  <Text style={styles.instructionsText}>
-                    • The arrow shows the static direction to the Kaaba
-                  </Text>
-                  <Text style={styles.instructionsText}>
-                    • Enable &quot;Live&quot; mode for automatic compass tracking
-                  </Text>
-                </>
-              )}
-            </View>
-          </>
-        )}
-      </View>
+            <Text style={styles.locationText}>
+              {location.address || `${location.latitude.toFixed(4)}, ${location.longitude.toFixed(4)}`}
+            </Text>
+            <Text style={styles.coordinatesText}>
+              Lat: {location.latitude.toFixed(6)}, Lng: {location.longitude.toFixed(6)}
+            </Text>
+          </View>
+        </View>
+      )}
     </SafeAreaView>
   );
 }
@@ -512,29 +473,29 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background,
   },
   header: {
-    paddingVertical: 30,
+    paddingVertical: 20,
     paddingHorizontal: 20,
   },
   headerContent: {
     alignItems: 'center',
   },
   title: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: 'bold',
     color: Colors.textOnPrimary,
     textAlign: 'center',
-    marginTop: 8,
-    marginBottom: 4,
+    marginTop: 6,
+    marginBottom: 2,
   },
   subtitle: {
-    fontSize: 16,
+    fontSize: 14,
     color: 'rgba(255, 255, 255, 0.9)',
     textAlign: 'center',
   },
   content: {
     flex: 1,
-    paddingHorizontal: 20,
-    paddingTop: 20,
+    paddingHorizontal: 16,
+    paddingTop: 16,
   },
   loadingContainer: {
     flex: 1,
@@ -602,20 +563,20 @@ const styles = StyleSheet.create({
   },
   compassContainer: {
     alignItems: 'center',
-    marginVertical: 20,
+    marginVertical: 16,
   },
   compassOuter: {
-    width: width * 0.8,
-    height: width * 0.8,
-    maxWidth: 320,
-    maxHeight: 320,
-    borderRadius: (width * 0.8) / 2,
+    width: width * 0.65,
+    height: width * 0.65,
+    maxWidth: 260,
+    maxHeight: 260,
+    borderRadius: (width * 0.65) / 2,
     overflow: 'hidden',
-    elevation: 12,
+    elevation: 8,
     shadowColor: Colors.text,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
   },
   compassGradient: {
     flex: 1,
@@ -746,8 +707,8 @@ const styles = StyleSheet.create({
   compassControls: {
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: 20,
-    marginTop: 15,
+    gap: 16,
+    marginTop: 12,
   },
   controlButton: {
     alignItems: 'center',
@@ -762,57 +723,44 @@ const styles = StyleSheet.create({
     color: Colors.primary,
     marginTop: 4,
   },
-  infoContainer: {
+  infoGrid: {
     flexDirection: 'row',
-    gap: 12,
-    marginBottom: 15,
-  },
-  deviceInfoContainer: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 20,
-  },
-  deviceInfoCard: {
-    flex: 1,
-    borderRadius: 16,
-    overflow: 'hidden',
-    elevation: 4,
-    shadowColor: Colors.text,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 16,
   },
   infoCard: {
     flex: 1,
-    borderRadius: 16,
+    minWidth: '48%',
+    borderRadius: 12,
     overflow: 'hidden',
-    elevation: 4,
+    elevation: 3,
     shadowColor: Colors.text,
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowRadius: 3,
   },
   infoGradient: {
-    padding: 20,
+    padding: 12,
     alignItems: 'center',
   },
   infoTitle: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '600',
     color: 'rgba(255, 255, 255, 0.9)',
-    marginBottom: 8,
+    marginBottom: 4,
+    textAlign: 'center',
   },
   infoValue: {
-    fontSize: 20,
+    fontSize: 16,
     fontWeight: 'bold',
     color: Colors.textOnPrimary,
     textAlign: 'center',
   },
   locationContainer: {
     backgroundColor: Colors.surface,
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 20,
+    borderRadius: 12,
+    padding: 12,
     elevation: 2,
     shadowColor: Colors.text,
     shadowOffset: { width: 0, height: 1 },
@@ -822,41 +770,22 @@ const styles = StyleSheet.create({
   locationHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
-    gap: 8,
+    marginBottom: 8,
+    gap: 6,
   },
   locationTitle: {
-    fontSize: 18,
+    fontSize: 14,
     fontWeight: 'bold',
     color: Colors.text,
   },
   locationText: {
-    fontSize: 16,
+    fontSize: 13,
     color: Colors.textSecondary,
-    marginBottom: 4,
+    marginBottom: 2,
   },
   coordinatesText: {
-    fontSize: 14,
+    fontSize: 11,
     color: Colors.textLight,
     fontFamily: 'monospace',
-  },
-  instructionsContainer: {
-    backgroundColor: Colors.surface,
-    borderRadius: 16,
-    padding: 20,
-    borderLeftWidth: 4,
-    borderLeftColor: Colors.islamicGold,
-  },
-  instructionsTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: Colors.text,
-    marginBottom: 12,
-  },
-  instructionsText: {
-    fontSize: 14,
-    color: Colors.textSecondary,
-    lineHeight: 20,
-    marginBottom: 8,
   },
 });

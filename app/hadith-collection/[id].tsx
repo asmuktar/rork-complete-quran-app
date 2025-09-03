@@ -43,7 +43,12 @@ export default function HadithCollectionScreen() {
       if (page === 1) {
         setAllHadiths(hadithsQuery.data.hadiths);
       } else {
-        setAllHadiths(prev => [...prev, ...hadithsQuery.data.hadiths]);
+        // Ensure we don't add duplicates and maintain sequential order
+        setAllHadiths(prev => {
+          const existingIds = new Set(prev.map(h => h.id));
+          const newHadiths = hadithsQuery.data.hadiths.filter(h => !existingIds.has(h.id));
+          return [...prev, ...newHadiths].sort((a, b) => a.number - b.number);
+        });
       }
       setHasMore(hadithsQuery.data.hasMore);
     }
@@ -180,7 +185,7 @@ export default function HadithCollectionScreen() {
         {!hasMore && allHadiths.length > 0 && (
           <View style={styles.endMessage}>
             <Text style={styles.endMessageText}>
-              You've reached the end of this collection
+              You&apos;ve reached the end of this collection
             </Text>
           </View>
         )}
