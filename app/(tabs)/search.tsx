@@ -10,6 +10,8 @@ import { SURAHS, searchSurahs } from '@/constants/quran-data';
 import { TOP_RECITERS, getReciterById } from '@/constants/reciters';
 import { useAudioPlayer } from '@/hooks/use-audio-player';
 import audioDownloadService from '@/services/audio-download-service';
+import offlineService from '@/services/offline-service';
+import { usePersonalization } from '@/contexts/personalization-context';
 
 const { width } = Dimensions.get('window');
 
@@ -39,6 +41,7 @@ interface SearchResult {
 }
 
 export default function SearchScreen() {
+  const { settings, fontSizeValue } = usePersonalization();
   const [searchQuery, setSearchQuery] = useState('');
   const [isRecording, setIsRecording] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -46,11 +49,12 @@ export default function SearchScreen() {
   const [hasSearched, setHasSearched] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [selectedReciter, setSelectedReciter] = useState('mishary-alafasy');
+  const [selectedReciter, setSelectedReciter] = useState(settings.defaultReciter.toString());
   const [downloadedReciters, setDownloadedReciters] = useState<string[]>([]);
   const [downloadProgress, setDownloadProgress] = useState<Record<string, number>>({});
   const [searchHistory, setSearchHistory] = useState<string[]>([]);
   const [trendingSearches] = useState(['Bismillah', 'Ayat al-Kursi', 'Al-Fatihah', 'Surah Yasin', 'Dua', 'Paradise', 'Forgiveness']);
+  const [isOnline, setIsOnline] = useState(true);
   
   const { 
     isPlaying, 
@@ -450,6 +454,16 @@ export default function SearchScreen() {
     return 'standard';
   }, []);
   
+  // Check network status
+  useEffect(() => {
+    const checkNetwork = () => {
+      setIsOnline(offlineService.getNetworkStatus());
+    };
+    checkNetwork();
+    const interval = setInterval(checkNetwork, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
   const searchMutation = trpc.quran.searchVerses.useMutation({
     onSuccess: async (data) => {
       const enhancedResults = await enhanceSearchResults(data, searchQuery);
@@ -461,10 +475,29 @@ export default function SearchScreen() {
         setSearchHistory(prev => [searchQuery.toLowerCase(), ...prev.slice(0, 9)]); // Keep last 10 searches
       }
     },
-    onError: (error) => {
+    onError: async (error) => {
       console.error('Search error:', error);
+      
+      // Try offline search as fallback
+      try {
+        const offlineResults = await offlineService.searchQuran(searchQuery);
+        if (offlineResults.matches && offlineResults.matches.length > 0) {
+          const enhancedResults = await enhanceSearchResults(offlineResults.matches, searchQuery);
+          setSearchResults(enhancedResults);
+          setIsLoading(false);
+          return;
+        }
+      } catch (offlineError) {
+        console.error('Offline search error:', offlineError);
+      }
+      
       setIsLoading(false);
-      Alert.alert('Search Error', 'Failed to search verses. Please try again.');
+      Alert.alert(
+        'Search Error', 
+        isOnline 
+          ? 'Failed to search verses. Please try again.' 
+          : 'No internet connection. Limited offline search available.'
+      );
     },
   });
   
@@ -567,7 +600,7 @@ export default function SearchScreen() {
     };
   }, [isRecording, pulseAnim]);
 
-  const performSearch = useCallback((query: string) => {
+  const performSearch = useCallback(async (query: string) => {
     if (!query.trim()) {
       setSearchResults([]);
       setHasSearched(false);
@@ -577,9 +610,33 @@ export default function SearchScreen() {
     setIsLoading(true);
     setHasSearched(true);
     
-    // Use the backend API for search
+    // Try offline search first if offline
+    if (!isOnline) {
+      try {
+        const offlineResults = await offlineService.searchQuran(query.trim());
+        if (offlineResults.matches && offlineResults.matches.length > 0) {
+          const enhancedResults = await enhanceSearchResults(offlineResults.matches, query);
+          setSearchResults(enhancedResults);
+          setIsLoading(false);
+          
+          // Add to search history
+          if (!searchHistory.includes(query.toLowerCase())) {
+            setSearchHistory(prev => [query.toLowerCase(), ...prev.slice(0, 9)]);
+          }
+          return;
+        }
+      } catch (error) {
+        console.error('Offline search error:', error);
+      }
+      
+      setIsLoading(false);
+      Alert.alert('Offline Search', 'No results found in offline data.');
+      return;
+    }
+    
+    // Use the backend API for online search
     searchMutation.mutate({ query: query.trim() });
-  }, [searchMutation]);
+  }, [searchMutation, isOnline, searchHistory, enhanceSearchResults]);
 
   const handleVoiceSearch = useCallback(async () => {
     if (isRecording) {
@@ -993,7 +1050,9 @@ export default function SearchScreen() {
         <View style={styles.headerContent}>
           <Search size={28} color={Colors.textOnPrimary} />
           <Text style={styles.title}>Ayat Search</Text>
-          <Text style={styles.subtitle}>AI-Powered Voice & Text Search</Text>
+          <Text style={styles.subtitle}>
+            {isOnline ? 'AI-Powered Voice & Text Search' : 'Offline Search Mode'}
+          </Text>
         </View>
       </LinearGradient>
 
@@ -1003,8 +1062,11 @@ export default function SearchScreen() {
           <View style={styles.searchBox}>
             <Search size={20} color={Colors.textLight} style={styles.searchIcon} />
             <TextInput
-              style={styles.searchInput}
-              placeholder="Search verses, surahs, reciters..."
+              style={[
+                styles.searchInput,
+                { fontSize: fontSizeValue }
+              ]}
+              placeholder={isOnline ? "Search verses, surahs, reciters..." : "Search offline content..."}
               value={searchQuery}
               onChangeText={handleTextSearch}
               placeholderTextColor={Colors.textLight}
@@ -1087,7 +1149,7 @@ export default function SearchScreen() {
           <View style={styles.loadingContainer}>
             <Loader size={32} color={Colors.primary} />
             <Text style={styles.loadingText}>
-              {isProcessing ? 'Processing voice...' : 'Searching...'}
+              {isProcessing ? 'Processing voice...' : isOnline ? 'Searching...' : 'Searching offline...'}
             </Text>
           </View>
         )}
@@ -1101,7 +1163,8 @@ export default function SearchScreen() {
             <Text style={styles.placeholderText}>
               • Type to search verses, surahs, or reciters{"\n"}
               • Use voice search by tapping the microphone{"\n"}
-              • Search in Arabic or English
+              • Search in Arabic or English{"\n"}
+              {!isOnline && '• Currently in offline mode - limited content available'}
             </Text>
             
             <View style={styles.examplesContainer}>
@@ -1148,6 +1211,7 @@ export default function SearchScreen() {
             <Text style={styles.noResultsTitle}>No results found</Text>
             <Text style={styles.noResultsText}>
               Try different keywords or check your spelling
+              {!isOnline && '\n\nOffline mode: Limited content available'}
             </Text>
           </View>
         )}

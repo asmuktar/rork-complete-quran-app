@@ -9,7 +9,11 @@ import { getSurahById, Ayah } from '@/constants/quran-data';
 import { useAudioPlayer } from '@/hooks/use-audio-player';
 import { TOP_RECITERS } from '@/constants/reciters';
 import { HafizProvider, useHafiz } from '@/contexts/hafiz-context';
+import { usePersonalization, useThemedColors, useThemedTypography } from '@/contexts/personalization-context';
+import { useBookmarks } from '@/contexts/bookmark-context';
 import MemoryTestModal from '@/components/MemoryTestModal';
+import NetworkStatus from '@/components/NetworkStatus';
+import offlineService from '@/services/offline-service';
 
 function SurahScreenContent() {
   const { id } = useLocalSearchParams();
@@ -17,13 +21,17 @@ function SurahScreenContent() {
   const surah = getSurahById(surahId);
   const scrollViewRef = useRef<ScrollView>(null);
   
+  const { settings } = usePersonalization();
+  const themedColors = useThemedColors();
+  const typography = useThemedTypography();
+  const { bookmarks, addBookmark, removeBookmark } = useBookmarks();
+  
   const [showSettings, setShowSettings] = useState(false);
-  const [bookmarkedAyahs, setBookmarkedAyahs] = useState<Set<number>>(new Set());
-  const [selectedReciter, setSelectedReciter] = useState('mishary-alafasy');
-  const [showTransliteration, setShowTransliteration] = useState(false);
+  const [selectedReciter, setSelectedReciter] = useState(settings.defaultReciter.toString());
   const [showReciterSelection, setShowReciterSelection] = useState(false);
   const [showTestModal, setShowTestModal] = useState(false);
   const [showHafizMode, setShowHafizMode] = useState(false);
+  const [isOnline, setIsOnline] = useState(true);
   
   const audioPlayer = useAudioPlayer();
   const { updateProgress, progress, startSession, isSessionActive } = useHafiz();
@@ -31,6 +39,48 @@ function SurahScreenContent() {
   useEffect(() => {
     audioPlayer.setReciter(selectedReciter);
   }, [selectedReciter, audioPlayer]);
+  
+  useEffect(() => {
+    const checkNetwork = () => {
+      setIsOnline(offlineService.getNetworkStatus());
+    };
+    checkNetwork();
+    const interval = setInterval(checkNetwork, 10000);
+    return () => clearInterval(interval);
+  }, []);
+  
+  // Get bookmarked ayahs for this surah
+  const bookmarkedAyahs = React.useMemo(() => {
+    return new Set(
+      bookmarks
+        .filter(b => b.type === 'ayah' && b.surahNumber === surahId)
+        .map(b => b.ayahNumber!)
+    );
+  }, [bookmarks, surahId]);
+  
+  const handleBookmarkAyah = async (ayahNumber: number) => {
+    const ayah = surah?.verses.find(v => v.number === ayahNumber);
+    if (!ayah) return;
+    
+    const bookmarkId = `ayah-${surahId}-${ayahNumber}`;
+    const isBookmarked = bookmarkedAyahs.has(ayahNumber);
+    
+    if (isBookmarked) {
+      await removeBookmark(bookmarkId);
+    } else {
+      await addBookmark({
+        id: bookmarkId,
+        type: 'ayah',
+        title: `Surah ${surah.englishName} - Ayah ${ayahNumber}`,
+        surahNumber: surahId,
+        ayahNumber,
+        surahName: surah.englishName,
+        arabicText: ayah.text,
+        translation: ayah.translation,
+        createdAt: Date.now()
+      });
+    }
+  };
   
   const handleReciterChange = (reciterId: string) => {
     setSelectedReciter(reciterId);

@@ -7,7 +7,9 @@ import { trpc, trpcClient } from "@/lib/trpc";
 import audioDownloadService from "@/services/audio-download-service";
 import { HafizProvider } from "@/contexts/hafiz-context";
 import { BookmarkProvider } from "@/contexts/bookmark-context";
+import { PersonalizationProvider } from "@/contexts/personalization-context";
 import notificationService from "@/services/notification-service";
+import offlineService from "@/services/offline-service";
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
@@ -52,6 +54,11 @@ export default function RootLayout() {
           console.error('Failed to initialize notification service:', error);
         });
         
+        // Initialize offline service
+        offlineService.preloadEssentialData().catch(error => {
+          console.error('Failed to preload essential data:', error);
+        });
+        
         await SplashScreen.hideAsync();
       } catch (error) {
         console.error('Error initializing app:', error);
@@ -65,13 +72,15 @@ export default function RootLayout() {
   return (
     <trpc.Provider client={trpcClient} queryClient={queryClient}>
       <QueryClientProvider client={queryClient}>
-        <BookmarkProvider>
-          <HafizProvider>
-            <GestureHandlerRootView>
-              <RootLayoutNav />
-            </GestureHandlerRootView>
-          </HafizProvider>
-        </BookmarkProvider>
+        <PersonalizationProvider>
+          <BookmarkProvider>
+            <HafizProvider>
+              <GestureHandlerRootView>
+                <RootLayoutNav />
+              </GestureHandlerRootView>
+            </HafizProvider>
+          </BookmarkProvider>
+        </PersonalizationProvider>
       </QueryClientProvider>
     </trpc.Provider>
   );
