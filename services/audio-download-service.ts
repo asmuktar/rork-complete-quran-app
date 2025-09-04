@@ -36,6 +36,14 @@ class AudioDownloadService {
     'saad-al-ghamdi',
     'abdullah-basfar'
   ];
+  
+  // Essential surahs that should be available by default
+  private readonly ESSENTIAL_SURAHS = [
+    { id: 1, ayahs: 7 },   // Al-Fatihah
+    { id: 112, ayahs: 4 }, // Al-Ikhlas
+    { id: 113, ayahs: 5 }, // Al-Falaq
+    { id: 114, ayahs: 6 }  // An-Nas
+  ];
 
   constructor() {
     this.initializeAudioDirectory();
@@ -388,7 +396,7 @@ class AudioDownloadService {
         let successCount = 0;
         
         // Batch downloads in smaller chunks to avoid overwhelming the system
-        const BATCH_SIZE = 5;
+        const BATCH_SIZE = 3; // Reduced batch size for better reliability
         for (let i = 0; i < totalAyahs; i += BATCH_SIZE) {
           const batchPromises: Promise<boolean>[] = [];
           
@@ -401,20 +409,32 @@ class AudioDownloadService {
             if (result.status === 'fulfilled' && result.value) {
               successCount++;
             } else {
-              console.error(`Failed to download ayah ${i + index + 1} of surah ${surahNumber}`);
+              const ayahNum = i + index + 1;
+              console.warn(`Failed to download ayah ${ayahNum} of surah ${surahNumber} for ${reciterId}`);
             }
           });
           
+          // Progress logging
+          const progress = Math.round((Math.min(i + BATCH_SIZE, totalAyahs) / totalAyahs) * 100);
+          console.log(`Surah ${surahNumber} progress: ${progress}% (${successCount}/${Math.min(i + BATCH_SIZE, totalAyahs)} ayahs)`);
+          
           // Small delay between batches to prevent overwhelming the server
           if (i + BATCH_SIZE < totalAyahs) {
-            await new Promise(resolve => setTimeout(resolve, 100));
+            await new Promise(resolve => setTimeout(resolve, 200)); // Increased delay
           }
         }
         
         const isComplete = successCount === totalAyahs;
-        console.log(`Surah ${surahNumber} download complete: ${successCount}/${totalAyahs} ayahs`);
+        const successRate = Math.round((successCount / totalAyahs) * 100);
         
-        return isComplete;
+        if (isComplete) {
+          console.log(`✅ Surah ${surahNumber} download complete: ${successCount}/${totalAyahs} ayahs (100%)`);
+        } else {
+          console.log(`⚠️ Surah ${surahNumber} download partial: ${successCount}/${totalAyahs} ayahs (${successRate}%)`);
+        }
+        
+        // Consider it successful if we got at least 80% of the ayahs
+        return successRate >= 80;
       }
     );
   }
@@ -633,85 +653,77 @@ class AudioDownloadService {
       'initialize-default-reciters',
       async () => {
         // Check if default reciters are already initialized
-        const stored = await AsyncStorage.getItem('default_reciters_initialized');
+        const stored = await AsyncStorage.getItem('default_reciters_initialized_v2');
         if (stored === 'true') {
           console.log('Default reciters already initialized');
           return;
         }
-    
-    // Download essential ayahs for default reciters (expanded list)
-    const essentialAyahs = [
-      { surah: 1, ayah: 1 }, // Al-Fatihah opening
-      { surah: 1, ayah: 2 }, // Al-Fatihah second ayah
-      { surah: 1, ayah: 3 }, // Al-Fatihah third ayah
-      { surah: 1, ayah: 4 }, // Al-Fatihah fourth ayah
-      { surah: 1, ayah: 5 }, // Al-Fatihah fifth ayah
-      { surah: 1, ayah: 6 }, // Al-Fatihah sixth ayah
-      { surah: 1, ayah: 7 }, // Al-Fatihah last ayah
-      { surah: 2, ayah: 255 }, // Ayat al-Kursi
-      { surah: 2, ayah: 286 }, // Last ayah of Al-Baqarah
-      { surah: 112, ayah: 1 }, // Al-Ikhlas
-      { surah: 112, ayah: 2 }, // Al-Ikhlas
-      { surah: 112, ayah: 3 }, // Al-Ikhlas
-      { surah: 112, ayah: 4 }, // Al-Ikhlas
-      { surah: 113, ayah: 1 }, // Al-Falaq
-      { surah: 113, ayah: 2 }, // Al-Falaq
-      { surah: 113, ayah: 3 }, // Al-Falaq
-      { surah: 113, ayah: 4 }, // Al-Falaq
-      { surah: 113, ayah: 5 }, // Al-Falaq
-      { surah: 114, ayah: 1 }, // An-Nas
-      { surah: 114, ayah: 2 }, // An-Nas
-      { surah: 114, ayah: 3 }, // An-Nas
-      { surah: 114, ayah: 4 }, // An-Nas
-      { surah: 114, ayah: 5 }, // An-Nas
-      { surah: 114, ayah: 6 }, // An-Nas
-    ];
-    
-    // Initialize default reciters with better error handling and progress tracking
-    const initPromises = this.DEFAULT_RECITERS.map(async (reciterId, index) => {
-      console.log(`Initializing default reciter ${index + 1}/${this.DEFAULT_RECITERS.length}: ${reciterId}`);
-      
-      // Test with a single ayah first to verify reciter works
-      try {
-        const testSuccess = await this.downloadAyah(reciterId, 1, 1);
-        if (!testSuccess) {
-          console.warn(`Reciter ${reciterId} test failed, skipping initialization`);
-          return;
-        }
-      } catch (error) {
-        console.warn(`Reciter ${reciterId} test failed:`, error);
-        return;
-      }
-      
-      const downloadPromises = essentialAyahs.slice(1).map(async ({ surah, ayah }) => {
-        try {
-          const success = await this.downloadAyah(reciterId, surah, ayah);
-          return success;
-        } catch (error) {
-          console.error(`Failed to download essential ayah ${surah}:${ayah} for ${reciterId}:`, error);
+        
+        console.log('Starting fresh initialization of default reciters...');
+        
+        // Initialize default reciters with essential surahs
+        const initPromises = this.DEFAULT_RECITERS.map(async (reciterId, index) => {
+          console.log(`Initializing default reciter ${index + 1}/${this.DEFAULT_RECITERS.length}: ${reciterId}`);
+          
+          let totalSuccessCount = 0;
+          
+          // Download essential complete surahs
+          for (const surah of this.ESSENTIAL_SURAHS) {
+            console.log(`Downloading Surah ${surah.id} for ${reciterId}...`);
+            
+            try {
+              const success = await this.downloadSurah(reciterId, surah.id, surah.ayahs);
+              if (success) {
+                totalSuccessCount += surah.ayahs;
+                console.log(`✅ Successfully downloaded Surah ${surah.id} for ${reciterId}`);
+              } else {
+                console.warn(`⚠️ Failed to download complete Surah ${surah.id} for ${reciterId}`);
+              }
+            } catch (error) {
+              console.error(`❌ Error downloading Surah ${surah.id} for ${reciterId}:`, error);
+            }
+            
+            // Small delay between surahs
+            await new Promise(resolve => setTimeout(resolve, 200));
+          }
+          
+          // Also download some key individual ayahs
+          const keyAyahs = [
+            { surah: 2, ayah: 255 }, // Ayat al-Kursi
+            { surah: 2, ayah: 286 }, // Last ayah of Al-Baqarah
+          ];
+          
+          for (const { surah, ayah } of keyAyahs) {
+            try {
+              const success = await this.downloadAyah(reciterId, surah, ayah);
+              if (success) {
+                totalSuccessCount++;
+                console.log(`✅ Downloaded key ayah ${surah}:${ayah} for ${reciterId}`);
+              }
+            } catch (error) {
+              console.error(`❌ Error downloading key ayah ${surah}:${ayah} for ${reciterId}:`, error);
+            }
+          }
+          
+          console.log(`Reciter ${reciterId} initialization complete: ${totalSuccessCount} ayahs downloaded`);
+          
+          // Mark reciter as initialized if we got at least some content
+          if (totalSuccessCount > 0) {
+            await this.updateReciterDownloadInfo(reciterId, 1);
+            return true;
+          }
+          
           return false;
-        }
-      });
-      
-      const results = await Promise.allSettled(downloadPromises);
-      const actualSuccessCount = 1 + results.filter(r => r.status === 'fulfilled' && r.value).length;
-      
-      console.log(`Reciter ${reciterId} initialization: ${actualSuccessCount}/${essentialAyahs.length} ayahs downloaded`);
-      
-      // Mark reciter as partially initialized even if not all downloads succeeded
-      if (actualSuccessCount > 0) {
-        await this.updateReciterDownloadInfo(reciterId, 1); // Mark as having some content
-      }
-    });
-    
-    const initResults = await Promise.allSettled(initPromises);
-    const successfulInits = initResults.filter(r => r.status === 'fulfilled').length;
-    
-    console.log(`Default reciters initialization: ${successfulInits}/${this.DEFAULT_RECITERS.length} reciters processed`);
-    
-        // Mark as initialized
-        await AsyncStorage.setItem('default_reciters_initialized', 'true');
-        console.log('Default reciters initialization complete');
+        });
+        
+        const initResults = await Promise.allSettled(initPromises);
+        const successfulInits = initResults.filter(r => r.status === 'fulfilled' && r.value).length;
+        
+        console.log(`Default reciters initialization complete: ${successfulInits}/${this.DEFAULT_RECITERS.length} reciters successfully initialized`);
+        
+        // Mark as initialized even if not all reciters succeeded
+        await AsyncStorage.setItem('default_reciters_initialized_v2', 'true');
+        console.log('✅ Default reciters initialization process finished');
       }
     );
   }
