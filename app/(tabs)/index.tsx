@@ -107,13 +107,7 @@ export default function HomeScreen() {
       route: '/prayer-times',
       gradient: Colors.gradients.ocean,
     },
-    {
-      title: 'Qibla Direction',
-      description: 'Find direction to Mecca',
-      icon: Compass,
-      route: '/qibla',
-      gradient: Colors.gradients.warm,
-    },
+
   ];
 
   return (

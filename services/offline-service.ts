@@ -266,7 +266,8 @@ class OfflineService {
       // Keep local SURAHS data intact
       
       return data;
-    } catch {
+    } catch (error) {
+      console.log('API fetch failed, using local data:', error);
       // Fallback to offline data
       return this.offlineData?.surahs || SURAHS;
     }
@@ -293,9 +294,14 @@ class OfflineService {
     try {
       console.log('Syncing data while online...');
       
-      // Sync surahs
-      const surahs = await quranApi.getAllSurahs();
-      await this.setCache('all_surahs', surahs);
+      // Try to sync surahs, but don't fail if network is unavailable
+      try {
+        const surahs = await quranApi.getAllSurahs();
+        await this.setCache('all_surahs', surahs);
+      } catch (networkError) {
+        console.log('Network sync failed, continuing with cached data:', networkError);
+        // Don't throw, just log and continue
+      }
       
       // Don't update offline data with API data to prevent structure conflicts
       // Keep local SURAHS data intact
@@ -307,6 +313,7 @@ class OfflineService {
       console.log('Data sync completed');
     } catch (error) {
       console.error('Error syncing data:', error);
+      // Don't throw the error, just log it
     }
   }
 

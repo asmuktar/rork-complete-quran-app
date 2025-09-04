@@ -10,9 +10,9 @@ const getBaseUrl = () => {
     return process.env.EXPO_PUBLIC_RORK_API_BASE_URL;
   }
 
-  throw new Error(
-    "No base url found, please set EXPO_PUBLIC_RORK_API_BASE_URL"
-  );
+  // For now, disable tRPC backend and use local data only
+  // This prevents network errors when backend is not available
+  return 'http://localhost:3000'; // Placeholder URL
 };
 
 export const trpcClient = trpc.createClient({

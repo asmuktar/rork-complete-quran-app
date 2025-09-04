@@ -4,13 +4,13 @@ import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { trpc, trpcClient } from "@/lib/trpc";
-import audioDownloadService from "@/services/audio-download-service";
+import { audioDownloadService } from "@/services/audio-download-service";
 import { HafizProvider } from "@/contexts/hafiz-context";
 import { BookmarkProvider } from "@/contexts/bookmark-context";
 import { PersonalizationProvider } from "@/contexts/personalization-context";
-import notificationService from "@/services/notification-service";
-import offlineService from "@/services/offline-service";
-import cacheService from "@/services/cache-service";
+import { notificationService } from "@/services/notification-service";
+import { offlineService } from "@/services/offline-service";
+import { cacheService } from "@/services/cache-service";
 
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
@@ -24,7 +24,7 @@ function RootLayoutNav() {
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="surahs" options={{ title: "Holy Qur'an" }} />
       <Stack.Screen name="surah/[id]" options={{ title: "Surah" }} />
-      <Stack.Screen name="qibla" options={{ title: "Qibla Direction" }} />
+
       <Stack.Screen name="calendar" options={{ title: "Islamic Calendar" }} />
       <Stack.Screen name="reciters" options={{ title: "Quran Reciters" }} />
       <Stack.Screen name="reciter/[id]" options={{ title: "Reciter Profile" }} />
@@ -51,24 +51,32 @@ export default function RootLayout() {
         console.log('🚀 Initializing performance optimization services...');
         
         // Preload essential cached data
-        cacheService.preloadEssentialData().catch(error => {
+        try {
+          await cacheService.preloadEssentialData();
+        } catch (error) {
           console.error('❌ Failed to preload essential cache data:', error);
-        });
+        }
         
         // Initialize default reciters in the background
-        audioDownloadService.initializeDefaultReciters().catch(error => {
+        try {
+          await audioDownloadService.initializeDefaultReciters();
+        } catch (error) {
           console.error('❌ Failed to initialize default reciters:', error);
-        });
+        }
         
-        // Initialize notification service
-        notificationService.initialize().catch(error => {
-          console.error('❌ Failed to initialize notification service:', error);
-        });
+        // Initialize notification service (skip if not supported)
+        try {
+          await notificationService.initialize();
+        } catch (error) {
+          console.log('⚠️ Notification service not available (expected in Expo Go):', error instanceof Error ? error.message : String(error));
+        }
         
         // Initialize offline service
-        offlineService.preloadEssentialData().catch(error => {
+        try {
+          await offlineService.preloadEssentialData();
+        } catch (error) {
           console.error('❌ Failed to preload essential data:', error);
-        });
+        }
         
         // Start resource monitoring
         console.log('✅ Performance optimization services initialized');

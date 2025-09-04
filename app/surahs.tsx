@@ -7,32 +7,79 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors } from '@/constants/colors';
 import { trpc } from '@/lib/trpc';
 import { useAudioPlayer } from '@/hooks/use-audio-player';
+import { SURAHS } from '@/constants/quran-data';
+import { offlineService } from '@/services/offline-service';
 
 export default function SurahsScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [filter, setFilter] = useState<'all' | 'meccan' | 'medinan'>('all');
   const [filteredSurahs, setFilteredSurahs] = useState<any[]>([]);
+  const [surahs, setSurahs] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const audioPlayer = useAudioPlayer();
-  const surahsQuery = trpc.quran.surahs.useQuery();
+  const surahsQuery = trpc.quran.surahs.useQuery(undefined, {
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
 
+  // Load surahs data with fallback to local data
   useEffect(() => {
-    if (!surahsQuery.data) return;
+    const loadSurahs = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+        
+        // Try to get data from tRPC first
+        if (surahsQuery.data) {
+          setSurahs(surahsQuery.data);
+        } else if (surahsQuery.error) {
+          // Fallback to offline service
+          console.log('tRPC failed, using offline service');
+          const offlineSurahs = await offlineService.getAllSurahs();
+          setSurahs(offlineSurahs || SURAHS);
+        } else {
+          // Use local data as immediate fallback
+          setSurahs(SURAHS);
+        }
+      } catch (err) {
+        console.error('Error loading surahs:', err);
+        setError('Failed to load surahs');
+        // Final fallback to local data
+        setSurahs(SURAHS);
+      } finally {
+        setIsLoading(false);
+      }
+    };
     
-    const filtered = surahsQuery.data.filter((surah: any) => {
-      const matchesSearch = surah.name_simple.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                           surah.translated_name.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                           surah.name_arabic.includes(searchQuery);
+    loadSurahs();
+  }, [surahsQuery.data, surahsQuery.error]);
+
+  // Filter surahs based on search and filter
+  useEffect(() => {
+    if (!surahs.length) return;
+    
+    const filtered = surahs.filter((surah: any) => {
+      // Handle both API format and local format
+      const name = surah.name_simple || surah.name || surah.englishName || '';
+      const translatedName = surah.translated_name?.name || surah.englishNameTranslation || '';
+      const arabicName = surah.name_arabic || surah.arabicName || '';
       
+      const matchesSearch = name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                           translatedName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                           arabicName.includes(searchQuery);
+      
+      const revelationPlace = surah.revelation_place || surah.revelationType;
       const matchesFilter = filter === 'all' || 
-                           (filter === 'meccan' && surah.revelation_place === 'makkah') ||
-                           (filter === 'medinan' && surah.revelation_place === 'madinah');
+                           (filter === 'meccan' && (revelationPlace === 'makkah' || revelationPlace === 'Meccan')) ||
+                           (filter === 'medinan' && (revelationPlace === 'madinah' || revelationPlace === 'Medinan'));
       
       return matchesSearch && matchesFilter;
     });
     
     setFilteredSurahs(filtered);
-  }, [searchQuery, filter, surahsQuery.data]);
+  }, [searchQuery, filter, surahs]);
 
   const totalAyahs = 6236;
   
@@ -87,17 +134,20 @@ export default function SurahsScreen() {
 
       {/* Surahs List */}
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {surahsQuery.isLoading ? (
+        {isLoading ? (
           <View style={styles.loadingContainer}>
             <RefreshCw size={48} color={Colors.primary} />
             <Text style={styles.loadingText}>Loading Surahs...</Text>
           </View>
-        ) : surahsQuery.error ? (
+        ) : error ? (
           <View style={styles.errorContainer}>
-            <Text style={styles.errorText}>Error loading surahs</Text>
+            <Text style={styles.errorText}>{error}</Text>
             <TouchableOpacity 
               style={styles.retryButton} 
-              onPress={() => surahsQuery.refetch()}
+              onPress={() => {
+                setError(null);
+                surahsQuery.refetch();
+              }}
             >
               <Text style={styles.retryText}>Retry</Text>
             </TouchableOpacity>
@@ -106,28 +156,30 @@ export default function SurahsScreen() {
           <TouchableOpacity
             key={surah.id}
             style={styles.surahCard}
-            onPress={() => router.push(`/surah/${surah.id}` as any)}
+            onPress={() => router.push(`/surah/${surah.id || surah.number}` as any)}
             activeOpacity={0.8}
           >
             <View style={styles.surahNumber}>
-              <Text style={styles.surahNumberText}>{surah.id}</Text>
+              <Text style={styles.surahNumberText}>{surah.id || surah.number}</Text>
             </View>
             
             <View style={styles.surahInfo}>
               <View style={styles.surahTitleRow}>
-                <Text style={styles.surahName}>{surah.name_simple}</Text>
-                <Text style={styles.surahArabicName}>{surah.name_arabic}</Text>
+                <Text style={styles.surahName}>{surah.name_simple || surah.name || surah.englishName}</Text>
+                <Text style={styles.surahArabicName}>{surah.name_arabic || surah.arabicName}</Text>
               </View>
-              <Text style={styles.surahEnglishName}>{surah.translated_name.name}</Text>
+              <Text style={styles.surahEnglishName}>{surah.translated_name?.name || surah.englishNameTranslation}</Text>
               
               <View style={styles.surahMeta}>
                 <View style={styles.metaItem}>
                   <Book size={14} color={Colors.textLight} />
-                  <Text style={styles.metaText}>{surah.verses_count} verses</Text>
+                  <Text style={styles.metaText}>{surah.verses_count || surah.numberOfAyahs} verses</Text>
                 </View>
                 <View style={styles.metaItem}>
                   <MapPin size={14} color={Colors.textLight} />
-                  <Text style={styles.metaText}>{surah.revelation_place === 'makkah' ? 'Meccan' : 'Medinan'}</Text>
+                  <Text style={styles.metaText}>
+                    {(surah.revelation_place === 'makkah' || surah.revelationType === 'Meccan') ? 'Meccan' : 'Medinan'}
+                  </Text>
                 </View>
               </View>
             </View>
@@ -136,7 +188,7 @@ export default function SurahsScreen() {
               style={styles.playButton}
               onPress={(e) => {
                 e.stopPropagation();
-                handlePlaySurah(surah.id, surah.verses_count);
+                handlePlaySurah(surah.id || surah.number, surah.verses_count || surah.numberOfAyahs);
               }}
               disabled={audioPlayer.isLoading}
             >
