@@ -16,14 +16,7 @@ interface MoreItem {
 }
 
 const moreItems: MoreItem[] = [
-  {
-    id: 'qibla',
-    title: 'Qibla Direction',
-    description: 'Find the direction to Mecca',
-    icon: Compass,
-    route: '/qibla',
-    gradient: Colors.gradients.islamic as [string, string]
-  },
+
   {
     id: 'calendar',
     title: 'Islamic Calendar',

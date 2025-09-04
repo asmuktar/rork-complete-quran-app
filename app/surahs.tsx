@@ -1,32 +1,40 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Search, Book, MapPin, Volume2 } from 'lucide-react-native';
+import { Search, Book, MapPin, Volume2, RefreshCw } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors } from '@/constants/colors';
-import { SURAHS, getTotalAyahs } from '@/constants/quran-data';
+import { trpc } from '@/lib/trpc';
 import { useAudioPlayer } from '@/hooks/use-audio-player';
 
 export default function SurahsScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [filter, setFilter] = useState<'all' | 'meccan' | 'medinan'>('all');
+  const [filteredSurahs, setFilteredSurahs] = useState<any[]>([]);
 
   const audioPlayer = useAudioPlayer();
-  
-  const filteredSurahs = SURAHS.filter(surah => {
-    const matchesSearch = surah.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         surah.englishName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         surah.arabicName.includes(searchQuery);
-    
-    const matchesFilter = filter === 'all' || 
-                         (filter === 'meccan' && surah.revelationType === 'Meccan') ||
-                         (filter === 'medinan' && surah.revelationType === 'Medinan');
-    
-    return matchesSearch && matchesFilter;
-  });
+  const surahsQuery = trpc.quran.surahs.useQuery();
 
-  const totalAyahs = getTotalAyahs();
+  useEffect(() => {
+    if (!surahsQuery.data) return;
+    
+    const filtered = surahsQuery.data.filter((surah: any) => {
+      const matchesSearch = surah.name_simple.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                           surah.translated_name.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                           surah.name_arabic.includes(searchQuery);
+      
+      const matchesFilter = filter === 'all' || 
+                           (filter === 'meccan' && surah.revelation_place === 'makkah') ||
+                           (filter === 'medinan' && surah.revelation_place === 'madinah');
+      
+      return matchesSearch && matchesFilter;
+    });
+    
+    setFilteredSurahs(filtered);
+  }, [searchQuery, filter, surahsQuery.data]);
+
+  const totalAyahs = 6236;
   
 
   
@@ -45,7 +53,7 @@ export default function SurahsScreen() {
         <View style={styles.headerContent}>
           <Book size={28} color={Colors.textOnPrimary} />
           <Text style={styles.title}>Holy Qur&apos;an</Text>
-          <Text style={styles.subtitle}>{SURAHS.length} Surahs • {totalAyahs.toLocaleString()} Ayahs</Text>
+          <Text style={styles.subtitle}>114 Surahs • {totalAyahs.toLocaleString()} Ayahs</Text>
         </View>
       </LinearGradient>
 
@@ -79,7 +87,22 @@ export default function SurahsScreen() {
 
       {/* Surahs List */}
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {filteredSurahs.map((surah) => (
+        {surahsQuery.isLoading ? (
+          <View style={styles.loadingContainer}>
+            <RefreshCw size={48} color={Colors.primary} />
+            <Text style={styles.loadingText}>Loading Surahs...</Text>
+          </View>
+        ) : surahsQuery.error ? (
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorText}>Error loading surahs</Text>
+            <TouchableOpacity 
+              style={styles.retryButton} 
+              onPress={() => surahsQuery.refetch()}
+            >
+              <Text style={styles.retryText}>Retry</Text>
+            </TouchableOpacity>
+          </View>
+        ) : filteredSurahs.map((surah) => (
           <TouchableOpacity
             key={surah.id}
             style={styles.surahCard}
@@ -92,19 +115,19 @@ export default function SurahsScreen() {
             
             <View style={styles.surahInfo}>
               <View style={styles.surahTitleRow}>
-                <Text style={styles.surahName}>{surah.name}</Text>
-                <Text style={styles.surahArabicName}>{surah.arabicName}</Text>
+                <Text style={styles.surahName}>{surah.name_simple}</Text>
+                <Text style={styles.surahArabicName}>{surah.name_arabic}</Text>
               </View>
-              <Text style={styles.surahEnglishName}>{surah.englishName}</Text>
+              <Text style={styles.surahEnglishName}>{surah.translated_name.name}</Text>
               
               <View style={styles.surahMeta}>
                 <View style={styles.metaItem}>
                   <Book size={14} color={Colors.textLight} />
-                  <Text style={styles.metaText}>{surah.ayahs} verses</Text>
+                  <Text style={styles.metaText}>{surah.verses_count} verses</Text>
                 </View>
                 <View style={styles.metaItem}>
                   <MapPin size={14} color={Colors.textLight} />
-                  <Text style={styles.metaText}>{surah.revelationType}</Text>
+                  <Text style={styles.metaText}>{surah.revelation_place === 'makkah' ? 'Meccan' : 'Medinan'}</Text>
                 </View>
               </View>
             </View>
@@ -113,7 +136,7 @@ export default function SurahsScreen() {
               style={styles.playButton}
               onPress={(e) => {
                 e.stopPropagation();
-                handlePlaySurah(surah.id, surah.ayahs);
+                handlePlaySurah(surah.id, surah.verses_count);
               }}
               disabled={audioPlayer.isLoading}
             >
@@ -315,5 +338,42 @@ const styles = StyleSheet.create({
     color: Colors.textLight,
     textAlign: 'center',
     fontWeight: '500',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+    paddingVertical: 60,
+  },
+  loadingText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: Colors.text,
+    textAlign: 'center',
+    marginTop: 16,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+    paddingVertical: 60,
+  },
+  errorText: {
+    fontSize: 16,
+    color: Colors.error,
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  retryButton: {
+    backgroundColor: Colors.primary,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  retryText: {
+    color: Colors.textOnPrimary,
+    fontWeight: '600',
   },
 });

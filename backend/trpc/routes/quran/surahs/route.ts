@@ -36,3 +36,16 @@ export const getSurahProcedure = publicProcedure
       throw new Error('Failed to fetch surah');
     }
   });
+
+export const getAllVersesWithTranslationsProcedure = publicProcedure
+  .query(async () => {
+    try {
+      // Fetch all verses with translations for search functionality
+      const response = await fetch(`${QURAN_API_BASE}/verses/by_page/1?language=en&words=true&translations=131,20&per_page=6236`);
+      const data = await response.json();
+      return data.verses || [];
+    } catch (error) {
+      console.error('Error fetching all verses:', error);
+      throw new Error('Failed to fetch verses');
+    }
+  });
