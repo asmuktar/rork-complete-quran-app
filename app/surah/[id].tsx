@@ -5,7 +5,7 @@ import { Play, Pause, Square, Settings, Bookmark, BookmarkCheck, Volume2, SkipBa
 import { useLocalSearchParams, Stack, router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors } from '@/constants/colors';
-import { getSurahById, Ayah } from '@/constants/quran-data';
+import { trpc } from '@/lib/trpc';
 import { useAudioPlayer } from '@/hooks/use-audio-player';
 import { TOP_RECITERS } from '@/constants/reciters';
 import { HafizProvider, useHafiz } from '@/contexts/hafiz-context';
@@ -18,8 +18,11 @@ import offlineService from '@/services/offline-service';
 function SurahScreenContent() {
   const { id } = useLocalSearchParams();
   const surahId = parseInt(id as string);
-  const surah = getSurahById(surahId);
   const scrollViewRef = useRef<ScrollView>(null);
+  
+  // Fetch surah data from API
+  const surahQuery = trpc.quran.surah.useQuery({ id: surahId });
+  const surah = surahQuery.data;
   
   const { settings } = usePersonalization();
   const themedColors = useThemedColors();
@@ -60,7 +63,7 @@ function SurahScreenContent() {
   }, [bookmarks, surahId]);
   
   const handleBookmarkAyah = async (ayahNumber: number) => {
-    const ayah = surah?.verses.find(v => v.number === ayahNumber);
+    const ayah = surah?.verses?.find((v: any) => v.verse_number === ayahNumber);
     if (!ayah || !surah) return;
     
     const bookmarkId = `ayah-${surahId}-${ayahNumber}`;
@@ -80,11 +83,11 @@ function SurahScreenContent() {
       await addBookmark({
         type: 'ayah',
         surahId: surahId,
-        surahName: surah.englishName,
-        surahArabicName: surah.arabicName,
+        surahName: surah.chapter?.name_simple || `Surah ${surahId}`,
+        surahArabicName: surah.chapter?.name_arabic || '',
         ayahNumber,
-        ayahText: ayah.text,
-        translation: ayah.translation,
+        ayahText: ayah.text_uthmani,
+        translation: ayah.translations?.[0]?.text || '',
         tags: []
       } as any);
     }
@@ -105,10 +108,18 @@ function SurahScreenContent() {
     }
   }, [audioPlayer.currentAyah, audioPlayer.autoScroll]);
   
-  if (!surah) {
+  if (surahQuery.isLoading) {
     return (
       <SafeAreaView style={styles.container}>
-        <Text style={styles.errorText}>Surah not found</Text>
+        <Text style={styles.errorText}>Loading surah...</Text>
+      </SafeAreaView>
+    );
+  }
+  
+  if (surahQuery.isError || !surah) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <Text style={styles.errorText}>Error loading surah: {surahQuery.error?.message || 'Unknown error'}</Text>
       </SafeAreaView>
     );
   }
@@ -117,7 +128,7 @@ function SurahScreenContent() {
     try {
       // Stop any current playback first
       await audioPlayer.stopPlayback();
-      await audioPlayer.playWholeSurah(surah.id, surah.ayahs);
+      await audioPlayer.playWholeSurah(surahId, surah.verses?.length || 0);
     } catch (error) {
       console.error('Error playing whole surah:', error);
       Alert.alert('Error', 'Failed to play surah. Please try again.');
@@ -128,7 +139,7 @@ function SurahScreenContent() {
     try {
       // Stop any current playback first
       await audioPlayer.stopPlayback();
-      await audioPlayer.playAyah(surah.id, ayahNumber);
+      await audioPlayer.playAyah(surahId, ayahNumber);
     } catch (error) {
       console.error('Error playing ayah:', error);
       Alert.alert('Error', 'Failed to play ayah. Please try again.');
@@ -145,7 +156,7 @@ function SurahScreenContent() {
     <SafeAreaView style={styles.container}>
       <Stack.Screen 
         options={{
-          title: surah.name,
+          title: surah.chapter?.name_simple || `Surah ${surahId}`,
           headerStyle: { backgroundColor: Colors.primary },
           headerTintColor: Colors.textOnPrimary,
           headerTitleStyle: { fontWeight: 'bold' },
@@ -155,10 +166,10 @@ function SurahScreenContent() {
       {/* Header */}
       <LinearGradient colors={Colors.gradients.islamic as [string, string]} style={styles.header}>
         <View style={styles.headerContent}>
-          <Text style={styles.surahName}>{surah.name}</Text>
-          <Text style={styles.surahArabicName}>{surah.arabicName}</Text>
+          <Text style={styles.surahName}>{surah.chapter?.name_simple || `Surah ${surahId}`}</Text>
+          <Text style={styles.surahArabicName}>{surah.chapter?.name_arabic || ''}</Text>
           <Text style={styles.surahInfo}>
-            {surah.englishName} • {surah.ayahs} verses • {surah.revelationType}
+            {surah.chapter?.name_simple || `Surah ${surahId}`} • {surah.chapter?.verses_count || surah.verses?.length || 0} verses • {surah.chapter?.revelation_place || 'Meccan'}
           </Text>
           <TouchableOpacity 
             style={styles.reciterSelector}
@@ -402,7 +413,7 @@ function SurahScreenContent() {
         showsVerticalScrollIndicator={false}
       >
         {/* Add Basmallah for all surahs except Al-Fatihah (1) and At-Tawbah (9) */}
-        {surah.id !== 1 && surah.id !== 9 && (
+        {surahId !== 1 && surahId !== 9 && (
           <View style={[styles.ayahCard, styles.basmallahCard]}>
             <View style={styles.ayahHeader}>
               <View style={[styles.ayahNumber, styles.basmallahNumber]}>
@@ -422,28 +433,28 @@ function SurahScreenContent() {
           </View>
         )}
         
-        {surah.verses.map((ayah: Ayah) => {
+        {surah.verses?.map((ayah: any) => {
           return (
             <View 
-              key={`${surah.id}-${ayah.number}`} 
+              key={`${surahId}-${ayah.verse_number}`} 
               style={[
                 styles.ayahCard,
-                audioPlayer.currentAyah === ayah.number && styles.ayahCardActive
+                audioPlayer.currentAyah === ayah.verse_number && styles.ayahCardActive
               ]}
             >
               <View style={styles.ayahHeader}>
                 <View style={styles.ayahNumber}>
                   <Text style={styles.ayahNumberText}>
-                    {ayah.number}
+                    {ayah.verse_number}
                   </Text>
                 </View>
                 
                 <View style={styles.ayahActions}>
                   <TouchableOpacity
-                    onPress={() => toggleBookmark(ayah.number)}
+                    onPress={() => toggleBookmark(ayah.verse_number)}
                     style={styles.actionButton}
                   >
-                    {bookmarkedAyahs.has(ayah.number) ? (
+                    {bookmarkedAyahs.has(ayah.verse_number) ? (
                       <BookmarkCheck size={20} color={Colors.islamicGold} />
                     ) : (
                       <Bookmark size={20} color={Colors.textLight} />
@@ -451,7 +462,7 @@ function SurahScreenContent() {
                   </TouchableOpacity>
                   
                   <TouchableOpacity
-                    onPress={() => handlePlayAyah(ayah.number)}
+                    onPress={() => handlePlayAyah(ayah.verse_number)}
                     style={styles.actionButton}
                     disabled={audioPlayer.isLoading}
                   >
@@ -461,25 +472,21 @@ function SurahScreenContent() {
               </View>
               
               <Text style={styles.ayahArabicText}>
-                {ayah.text}
+                {ayah.text_uthmani}
               </Text>
               
-              {showTransliteration && ayah.transliteration && (
-                <Text style={styles.ayahTransliteration}>{ayah.transliteration}</Text>
-              )}
-              
-              <Text style={styles.ayahTranslation}>{ayah.translation}</Text>
+              <Text style={styles.ayahTranslation}>{ayah.translations?.[0]?.text || ''}</Text>
               
               <View style={styles.ayahMeta}>
-                <Text style={styles.metaText}>Juz {ayah.juz} • Hizb {ayah.hizb}</Text>
+                <Text style={styles.metaText}>Juz {ayah.juz_number || 1} • Hizb {ayah.hizb_number || 1}</Text>
               </View>
             </View>
           );
-        })}
+        }) || []}
         
         <View style={styles.footer}>
-          <Text style={styles.footerText}>End of Surah {surah.name}</Text>
-          <Text style={styles.footerSubtext}>{surah.englishName}</Text>
+          <Text style={styles.footerText}>End of Surah {surah.chapter?.name_simple || `Surah ${surahId}`}</Text>
+          <Text style={styles.footerSubtext}>{surah.chapter?.name_simple || `Surah ${surahId}`}</Text>
         </View>
       </ScrollView>
     </SafeAreaView>

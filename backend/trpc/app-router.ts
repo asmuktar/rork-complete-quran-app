@@ -1,6 +1,6 @@
 import { createTRPCRouter } from "./create-context";
 import hiRoute from "./routes/example/hi/route";
-import { getSurahsProcedure, getSurahProcedure, getAllVersesWithTranslationsProcedure } from "./routes/quran/surahs/route";
+import { getSurahsProcedure, getSurahProcedure, getAllVersesWithTranslationsProcedure, getAyahProcedure } from "./routes/quran/surahs/route";
 import { searchVersesProcedure, voiceSearchProcedure } from "./routes/quran/search/route";
 import { getHadithCollectionsProcedure, getHadithsProcedure, searchHadithsProcedure, verifyHadithProcedure } from "./routes/hadith/collections/route";
 import { getPrayerTimesProcedure, getQiblaProcedure } from "./routes/islamic/prayer-times/route";
@@ -13,6 +13,7 @@ export const appRouter = createTRPCRouter({
   quran: createTRPCRouter({
     surahs: getSurahsProcedure,
     surah: getSurahProcedure,
+    ayah: getAyahProcedure,
     search: searchVersesProcedure,
     voiceSearch: voiceSearchProcedure,
     allVerses: getAllVersesWithTranslationsProcedure,

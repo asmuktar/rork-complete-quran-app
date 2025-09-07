@@ -7,7 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors } from '@/constants/colors';
 import { trpc } from '@/lib/trpc';
 import { useAudioPlayer } from '@/hooks/use-audio-player';
-import { SURAHS } from '@/constants/quran-data';
+
 import { offlineService } from '@/services/offline-service';
 
 export default function SurahsScreen() {
@@ -20,7 +20,7 @@ export default function SurahsScreen() {
 
   const audioPlayer = useAudioPlayer();
   const surahsQuery = trpc.quran.surahs.useQuery(undefined, {
-    retry: false,
+    retry: 2,
     refetchOnWindowFocus: false,
   });
 
@@ -38,16 +38,16 @@ export default function SurahsScreen() {
           // Fallback to offline service
           console.log('tRPC failed, using offline service');
           const offlineSurahs = await offlineService.getAllSurahs();
-          setSurahs(offlineSurahs || SURAHS);
+          setSurahs(offlineSurahs || []);
         } else {
-          // Use local data as immediate fallback
-          setSurahs(SURAHS);
+          // Use empty array as fallback
+          setSurahs([]);
         }
       } catch (err) {
         console.error('Error loading surahs:', err);
         setError('Failed to load surahs');
-        // Final fallback to local data
-        setSurahs(SURAHS);
+        // Final fallback to empty array
+        setSurahs([]);
       } finally {
         setIsLoading(false);
       }
