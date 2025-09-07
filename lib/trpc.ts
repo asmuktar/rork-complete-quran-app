@@ -10,16 +10,26 @@ const getBaseUrl = () => {
     return process.env.EXPO_PUBLIC_RORK_API_BASE_URL;
   }
 
-  // For now, disable tRPC backend and use local data only
-  // This prevents network errors when backend is not available
-  return 'http://localhost:3000'; // Placeholder URL
+  // Return null when no backend URL is configured
+  // This will cause network requests to fail gracefully
+  return null;
 };
+
+const baseUrl = getBaseUrl();
 
 export const trpcClient = trpc.createClient({
   links: [
     httpLink({
-      url: `${getBaseUrl()}/api/trpc`,
+      url: baseUrl ? `${baseUrl}/api/trpc` : 'http://localhost:3000/api/trpc',
       transformer: superjson,
+      fetch: async (url, options) => {
+        // If no backend URL is configured, return empty responses
+        if (!baseUrl) {
+          console.log('🔄 Backend not configured, using local data only');
+          throw new Error('Backend not available - using local data');
+        }
+        return fetch(url, options);
+      },
     }),
   ],
 });

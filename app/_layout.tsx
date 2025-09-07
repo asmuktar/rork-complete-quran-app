@@ -16,7 +16,27 @@ import { cacheService } from "@/services/cache-service";
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: (failureCount, error) => {
+        // Don't retry network errors when backend is not available
+        if (error instanceof Error && error.message.includes('Backend not available')) {
+          return false;
+        }
+        // Retry other errors up to 2 times
+        return failureCount < 2;
+      },
+      staleTime: 5 * 60 * 1000, // 5 minutes
+      gcTime: 10 * 60 * 1000, // 10 minutes (formerly cacheTime)
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: true,
+    },
+    mutations: {
+      retry: false, // Don't retry mutations
+    },
+  },
+});
 
 function RootLayoutNav() {
   return (
@@ -47,40 +67,53 @@ export default function RootLayout() {
   useEffect(() => {
     const initializeApp = async () => {
       try {
-        // Initialize performance optimization services
-        console.log('🚀 Initializing performance optimization services...');
+        console.log('🚀 Starting app initialization...');
         
-        // Preload essential cached data
-        try {
-          await cacheService.preloadEssentialData();
-        } catch (error) {
-          console.error('❌ Failed to preload essential cache data:', error);
-        }
+        // Minimal initialization - just hide splash screen quickly
+        setTimeout(async () => {
+          try {
+            await SplashScreen.hideAsync();
+            console.log('✅ App loaded successfully');
+          } catch (error) {
+            console.error('Error hiding splash screen:', error);
+          }
+        }, 1000);
         
-        // Initialize default reciters in the background (non-blocking)
-        audioDownloadService.initializeDefaultReciters().catch(error => {
-          console.error('❌ Failed to initialize default reciters:', error);
-        });
+        // Initialize services in background (completely non-blocking)
+        setTimeout(() => {
+          console.log('🔄 Starting background services...');
+          
+          // Cache service
+          cacheService.preloadEssentialData().catch(error => {
+            console.log('⚠️ Cache service skipped:', error.message);
+          });
+          
+          // Notification service
+          notificationService.initialize().catch(error => {
+            console.log('⚠️ Notifications not available (expected in Expo Go)');
+          });
+          
+          // Audio service
+          audioDownloadService.initializeDefaultReciters().catch(error => {
+            console.log('⚠️ Audio service skipped:', error.message);
+          });
+          
+          // Offline service
+          offlineService.preloadEssentialData().catch(error => {
+            console.log('⚠️ Offline service skipped:', error.message);
+          });
+          
+          console.log('✅ Background services started');
+        }, 2000);
         
-        // Initialize notification service (skip if not supported)
-        try {
-          await notificationService.initialize();
-        } catch (error) {
-          console.log('⚠️ Notification service not available (expected in Expo Go):', error instanceof Error ? error.message : String(error));
-        }
-        
-        // Initialize offline service (non-blocking)
-        offlineService.preloadEssentialData().catch(error => {
-          console.error('❌ Failed to preload essential data:', error);
-        });
-        
-        // Start resource monitoring
-        console.log('✅ Performance optimization services initialized');
-        
-        await SplashScreen.hideAsync();
       } catch (error) {
-        console.error('Error initializing app:', error);
-        await SplashScreen.hideAsync();
+        console.error('❌ App initialization error:', error);
+        // Still try to hide splash screen
+        try {
+          await SplashScreen.hideAsync();
+        } catch (splashError) {
+          console.error('Error hiding splash screen:', splashError);
+        }
       }
     };
     
@@ -90,15 +123,15 @@ export default function RootLayout() {
   return (
     <trpc.Provider client={trpcClient} queryClient={queryClient}>
       <QueryClientProvider client={queryClient}>
-        <PersonalizationProvider>
-          <BookmarkProvider>
-            <HafizProvider>
-              <GestureHandlerRootView>
+        <GestureHandlerRootView style={{ flex: 1 }}>
+          <PersonalizationProvider>
+            <BookmarkProvider>
+              <HafizProvider>
                 <RootLayoutNav />
-              </GestureHandlerRootView>
-            </HafizProvider>
-          </BookmarkProvider>
-        </PersonalizationProvider>
+              </HafizProvider>
+            </BookmarkProvider>
+          </PersonalizationProvider>
+        </GestureHandlerRootView>
       </QueryClientProvider>
     </trpc.Provider>
   );
