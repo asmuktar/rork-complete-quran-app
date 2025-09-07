@@ -295,7 +295,7 @@ export default function DownloadManager({ reciterId, onDownloadComplete }: Downl
               </View>
 
               {/* Surah List */}
-              <View style={styles.surahList}>
+              <ScrollView style={styles.surahList} showsVerticalScrollIndicator={false}>
                 {SURAHS.map((surah) => {
                   const isSelected = selectedSurahs.has(surah.id);
                   return (
@@ -333,7 +333,7 @@ export default function DownloadManager({ reciterId, onDownloadComplete }: Downl
                     </TouchableOpacity>
                   );
                 })}
-              </View>
+              </ScrollView>
 
               {/* Download Button */}
               {selectedSurahs.size > 0 && (
@@ -700,7 +700,10 @@ const styles = StyleSheet.create({
     marginLeft: 'auto',
   },
   surahList: {
-    maxHeight: 400,
+    maxHeight: 300,
+    backgroundColor: Colors.background,
+    borderRadius: 8,
+    padding: 8,
   },
   surahItem: {
     flexDirection: 'row',

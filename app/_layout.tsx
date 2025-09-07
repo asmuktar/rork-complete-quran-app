@@ -57,12 +57,10 @@ export default function RootLayout() {
           console.error('❌ Failed to preload essential cache data:', error);
         }
         
-        // Initialize default reciters in the background
-        try {
-          await audioDownloadService.initializeDefaultReciters();
-        } catch (error) {
+        // Initialize default reciters in the background (non-blocking)
+        audioDownloadService.initializeDefaultReciters().catch(error => {
           console.error('❌ Failed to initialize default reciters:', error);
-        }
+        });
         
         // Initialize notification service (skip if not supported)
         try {
@@ -71,12 +69,10 @@ export default function RootLayout() {
           console.log('⚠️ Notification service not available (expected in Expo Go):', error instanceof Error ? error.message : String(error));
         }
         
-        // Initialize offline service
-        try {
-          await offlineService.preloadEssentialData();
-        } catch (error) {
+        // Initialize offline service (non-blocking)
+        offlineService.preloadEssentialData().catch(error => {
           console.error('❌ Failed to preload essential data:', error);
-        }
+        });
         
         // Start resource monitoring
         console.log('✅ Performance optimization services initialized');

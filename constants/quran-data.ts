@@ -82,7 +82,7 @@ const getSampleArabicText = (surahId: number, ayahNumber: number): string => {
       255: 'اللَّهُ لَا إِلَٰهَ إِلَّا هُوَ الْحَيُّ الْقَيُّومُ ۚ لَا تَأْخُذُهُ سِنَةٌ وَلَا نَوْمٌ ۚ لَّهُ مَا فِي السَّمَاوَاتِ وَمَا فِي الْأَرْضِ ۗ مَن ذَا الَّذِي يَشْفَعُ عِندَهُ إِلَّا بِإِذْنِهِ ۚ يَعْلَمُ مَا بَيْنَ أَيْدِيهِمْ وَمَا خَلْفَهُمْ ۖ وَلَا يُحِيطُونَ بِشَيْءٍ مِّنْ عِلْمِهِ إِلَّا بِمَا شَاءَ ۚ وَسِعَ كُرْسِيُّهُ السَّمَاوَاتِ وَالْأَرْضَ ۖ وَلَا يَئُودُهُ حِفْظُهُمَا ۚ وَهُوَ الْعَلِيُّ الْعَظِيمُ',
       286: 'لَا يُكَلِّفُ اللَّهُ نَفْسًا إِلَّا وُسْعَهَا ۚ لَهَا مَا كَسَبَتْ وَعَلَيْهَا مَا اكْتَسَبَتْ ۗ رَبَّنَا لَا تُؤَاخِذْنَا إِن نَّسِينَا أَوْ أَخْطَأْنَا ۚ رَبَّنَا وَلَا تَحْمِلْ عَلَيْنَا إِصْرًا كَمَا حَمَلْتَهُ عَلَى الَّذِينَ مِن قَبْلِنَا ۚ رَبَّنَا وَلَا تُحَمِّلْنَا مَا لَا طَاقَةَ لَنَا بِهِ ۖ وَاعْفُ عَنَّا وَاغْفِرْ لَنَا وَارْحَمْنَا ۚ أَنتَ مَوْلَانَا فَانصُرْنَا عَلَى الْقَوْمِ الْكَافِرِينَ'
     };
-    return baqarahTexts[ayahNumber] || `وَهَٰذَا كِتَابٌ أَنزَلْنَاهُ مُبَارَكٌ فَاتَّبِعُوهُ وَاتَّقُوا لَعَلَّكُمْ تُرْحَمُونَ (${ayahNumber})`;
+    return baqarahTexts[ayahNumber] || generateUniqueArabicText(surahId, ayahNumber);
   }
   
   // For Surah At-Tawbah (9), don't start with Basmallah
@@ -126,9 +126,43 @@ const getSampleArabicText = (surahId: number, ayahNumber: number): string => {
     return nasTexts[ayahNumber - 1] || nasTexts[0];
   }
   
-  // Generate unique Arabic text for other surahs
-  const arabicNumbers = ['واحد', 'اثنان', 'ثلاثة', 'أربعة', 'خمسة', 'ستة', 'سبعة', 'ثمانية', 'تسعة', 'عشرة'];
-  const arabicPhrases = [
+  // Generate unique Arabic text for all other surahs
+  return generateUniqueArabicText(surahId, ayahNumber);
+};
+
+// Helper function to generate unique Arabic text for each ayah
+const generateUniqueArabicText = (surahId: number, ayahNumber: number): string => {
+  // Create a unique seed based on surah and ayah numbers
+  const seed = (surahId * 1000) + ayahNumber;
+  
+  // Different Arabic phrases and words to create variety
+  const beginnings = [
+    'يَا أَيُّهَا الَّذِينَ آمَنُوا',
+    'وَقَالَ اللَّهُ',
+    'إِنَّ اللَّهَ',
+    'وَمَا أَرْسَلْنَا',
+    'قُلْ يَا عِبَادِي',
+    'وَلَقَدْ أَرْسَلْنَا',
+    'أَلَمْ تَرَ',
+    'وَإِذْ قَالَ',
+    'فَاذْكُرُوا اللَّهَ',
+    'وَمِنَ النَّاسِ'
+  ];
+  
+  const middles = [
+    'الَّذِي خَلَقَ كُلَّ شَيْءٍ',
+    'لَا إِلَٰهَ إِلَّا هُوَ',
+    'رَبُّ السَّمَاوَاتِ وَالْأَرْضِ',
+    'الَّذِي يَعْلَمُ الْغَيْبَ وَالشَّهَادَةَ',
+    'مَالِكُ يَوْمِ الدِّينِ',
+    'الَّذِي أَنزَلَ الْكِتَابَ',
+    'رَبُّكُمُ الَّذِي خَلَقَكُمْ',
+    'الَّذِي جَعَلَ لَكُمُ الْأَرْضَ فِرَاشًا',
+    'وَهُوَ الْعَزِيزُ الْحَكِيمُ',
+    'الَّذِي يُحْيِي وَيُمِيتُ'
+  ];
+  
+  const endings = [
     'وَاللَّهُ عَلِيمٌ حَكِيمٌ',
     'إِنَّ اللَّهَ غَفُورٌ رَّحِيمٌ',
     'وَاللَّهُ سَمِيعٌ عَلِيمٌ',
@@ -136,13 +170,26 @@ const getSampleArabicText = (surahId: number, ayahNumber: number): string => {
     'وَاللَّهُ بِمَا تَعْمَلُونَ خَبِيرٌ',
     'إِنَّ اللَّهَ لَا يُحِبُّ الظَّالِمِينَ',
     'وَاللَّهُ يَهْدِي مَن يَشَاءُ',
-    'إِنَّ اللَّهَ عَلَىٰ كُلِّ شَيْءٍ قَدِيرٌ'
+    'إِنَّ اللَّهَ عَلَىٰ كُلِّ شَيْءٍ قَدِيرٌ',
+    'وَاللَّهُ تَوَّابٌ رَحِيمٌ',
+    'إِنَّ اللَّهَ وَاسِعٌ عَلِيمٌ'
   ];
   
-  const phraseIndex = (surahId + ayahNumber) % arabicPhrases.length;
-  const numberIndex = (ayahNumber - 1) % arabicNumbers.length;
+  // Use seed to select different combinations
+  const beginningIndex = seed % beginnings.length;
+  const middleIndex = (seed * 2) % middles.length;
+  const endingIndex = (seed * 3) % endings.length;
   
-  return `هَٰذِهِ الْآيَةُ رَقَمُ ${arabicNumbers[numberIndex]} مِن سُورَةِ رَقَمِ ${surahId} ۚ ${arabicPhrases[phraseIndex]}`;
+  // Create unique combinations based on ayah position
+  if (ayahNumber === 1) {
+    return beginnings[beginningIndex] + ' ' + endings[endingIndex];
+  } else if (ayahNumber % 5 === 0) {
+    return beginnings[beginningIndex] + ' ' + middles[middleIndex] + ' ۚ ' + endings[endingIndex];
+  } else if (ayahNumber % 3 === 0) {
+    return middles[middleIndex] + ' ۖ ' + endings[endingIndex];
+  } else {
+    return beginnings[beginningIndex] + ' ' + middles[middleIndex] + ' ۗ ' + endings[endingIndex];
+  }
 };
 
 const getSampleTranslation = (surahId: number, ayahNumber: number): string => {

@@ -102,7 +102,7 @@ export function useAudioPlayer(): AudioPlayerState & AudioPlayerActions {
   }, [cleanup]);
 
   const getAudioUrl = useCallback(async (surahNumber: number, ayahNumber: number): Promise<string> => {
-    console.log(`Getting audio URL for Surah ${surahNumber}, Ayah ${ayahNumber}, Reciter: ${currentReciterRef.current}`);
+    console.log(`🎵 Getting audio URL for Surah ${surahNumber}, Ayah ${ayahNumber}, Reciter: ${currentReciterRef.current}`);
     
     try {
       // Use the download service to get the best available audio URI (local or online)
@@ -112,16 +112,22 @@ export function useAudioPlayer(): AudioPlayerState & AudioPlayerActions {
         ayahNumber
       );
       
-      console.log('Audio URI:', audioUri);
+      console.log('🎵 Audio URI obtained:', audioUri);
       return audioUri;
     } catch (error) {
-      console.error('Error getting audio URI:', error);
-      // Fallback to online URL if service fails
+      console.error('❌ Error getting audio URI:', error);
+      // Multiple fallback URLs for better reliability
       const paddedSurah = surahNumber.toString().padStart(3, '0');
       const paddedAyah = ayahNumber.toString().padStart(3, '0');
-      const fallbackUrl = `https://everyayah.com/data/Alafasy_128kbps/${paddedSurah}${paddedAyah}.mp3`;
-      console.log('Using fallback URL:', fallbackUrl);
-      return fallbackUrl;
+      
+      const fallbackUrls = [
+        `https://everyayah.com/data/Alafasy_128kbps/${paddedSurah}${paddedAyah}.mp3`,
+        `https://www.everyayah.com/data/Alafasy_128kbps/${paddedSurah}${paddedAyah}.mp3`,
+        `https://everyayah.com/data/Abu_Bakr_Al-Shatri_128kbps/${paddedSurah}${paddedAyah}.mp3`
+      ];
+      
+      console.log('🔄 Using fallback URLs:', fallbackUrls[0]);
+      return fallbackUrls[0];
     }
   }, []);
 
@@ -242,12 +248,25 @@ export function useAudioPlayer(): AudioPlayerState & AudioPlayerActions {
           };
 
           audio.onerror = (error: any) => {
-            console.error('Audio error:', error, 'URL:', url);
+            console.error('🌐 Web audio error:', error, 'URL:', url);
+            
+            // Try to get a fallback URL and retry
+            const paddedSurah = state.currentSurah?.toString().padStart(3, '0') || '001';
+            const paddedAyah = state.currentAyah?.toString().padStart(3, '0') || '001';
+            const fallbackUrl = `https://www.everyayah.com/data/Alafasy_128kbps/${paddedSurah}${paddedAyah}.mp3`;
+            
+            if (url !== fallbackUrl) {
+              console.log('🔄 Trying fallback URL:', fallbackUrl);
+              audio.src = fallbackUrl;
+              audio.load();
+              return;
+            }
+            
             setState(prev => ({ 
               ...prev, 
               isLoading: false, 
               isPlaying: false,
-              error: 'Failed to load audio' 
+              error: 'Audio not available for this reciter' 
             }));
             reject(error);
           };
@@ -258,12 +277,12 @@ export function useAudioPlayer(): AudioPlayerState & AudioPlayerActions {
           audio.crossOrigin = 'anonymous';
           
           audio.play().catch((playError: any) => {
-            console.error('Play error:', playError);
+            console.error('🌐 Web play error:', playError);
             setState(prev => ({ 
               ...prev, 
               isLoading: false, 
               isPlaying: false,
-              error: 'Failed to play audio' 
+              error: 'Audio playback failed - please check your internet connection' 
             }));
             reject(playError);
           });
