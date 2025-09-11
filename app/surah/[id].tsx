@@ -459,6 +459,16 @@ function SurahScreenContent() {
         )}
         
         {surah.verses?.map((ayah: any) => {
+          // Debug: Log the ayah data to understand the structure
+          if (ayah.verse_number <= 3) {
+            console.log(`Rendering ayah ${ayah.verse_number} of surah ${surahId}:`, {
+              verse_number: ayah.verse_number,
+              text_uthmani: ayah.text_uthmani?.substring(0, 50),
+              hasArabicText: ayah.text_uthmani && /[\u0600-\u06FF]/.test(ayah.text_uthmani),
+              allFields: Object.keys(ayah)
+            });
+          }
+          
           return (
             <View 
               key={`${surahId}-${ayah.verse_number}`} 

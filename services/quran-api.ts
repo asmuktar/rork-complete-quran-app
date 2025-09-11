@@ -61,11 +61,11 @@ class QuranApiService {
       return cached;
     }
     
-    // Primary API: AlQuran.cloud simple endpoint (most reliable)
+    // Primary API: AlQuran.cloud with specific edition to avoid Bismillah issues
     try {
-      console.log(`Fetching surah ${surahNumber} from AlQuran.cloud simple API`);
+      console.log(`Fetching surah ${surahNumber} from AlQuran.cloud with quran-uthmani edition`);
       const response = await enhancedFetch(
-        `${this.alQuranUrl}/surah/${surahNumber}`,
+        `${this.alQuranUrl}/surah/${surahNumber}/quran-uthmani`,
         { retries: 3 }
       );
       
@@ -74,11 +74,18 @@ class QuranApiService {
       }
       
       const data = await response.json();
-      console.log(`AlQuran.cloud simple API response for surah ${surahNumber}:`, {
+      console.log(`AlQuran.cloud uthmani API response for surah ${surahNumber}:`, {
         hasData: !!data.data,
         hasAyahs: !!data.data?.ayahs,
         ayahsCount: data.data?.ayahs?.length || 0,
-        firstAyahText: data.data?.ayahs?.[0]?.text?.substring(0, 50)
+        firstAyahText: data.data?.ayahs?.[0]?.text?.substring(0, 50),
+        firstAyahNumber: data.data?.ayahs?.[0]?.numberInSurah,
+        edition: data.data?.edition?.identifier,
+        sampleAyahs: data.data?.ayahs?.slice(0, 3).map((a: any) => ({
+          numberInSurah: a.numberInSurah,
+          text: a.text?.substring(0, 30),
+          hasArabic: a.text && /[\u0600-\u06FF]/.test(a.text)
+        }))
       });
       
       if (data.data && data.data.ayahs && data.data.ayahs.length > 0) {
@@ -104,6 +111,12 @@ class QuranApiService {
           numberOfAyahs: data.data.numberOfAyahs || data.data.ayahs.length,
           ayahs: data.data.ayahs.map((ayah: any, index: number) => {
             const englishAyah = englishTranslations[index];
+            
+            // Debug logging for first few ayahs
+            if (index < 3) {
+              console.log(`Surah ${surahNumber}, Ayah ${ayah.numberInSurah}: "${ayah.text?.substring(0, 50)}..."`);
+            }
+            
             return {
               number: ayah.number,
               text: ayah.text || '',
@@ -132,7 +145,7 @@ class QuranApiService {
         return normalizedData;
       }
     } catch (error) {
-      console.error(`AlQuran.cloud simple API failed for surah ${surahNumber}:`, error);
+      console.error(`AlQuran.cloud uthmani API failed for surah ${surahNumber}:`, error);
     }
     
     // Fallback API: Quran.com
