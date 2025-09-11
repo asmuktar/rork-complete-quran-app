@@ -152,9 +152,9 @@ export default function SurahsScreen() {
               <Text style={styles.retryText}>Retry</Text>
             </TouchableOpacity>
           </View>
-        ) : filteredSurahs.map((surah) => (
+        ) : filteredSurahs.map((surah, index) => (
           <TouchableOpacity
-            key={surah.id}
+            key={surah.id || surah.number || index}
             style={styles.surahCard}
             onPress={() => router.push(`/surah/${surah.id || surah.number}` as any)}
             activeOpacity={0.8}
