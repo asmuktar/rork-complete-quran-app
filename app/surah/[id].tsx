@@ -140,7 +140,13 @@ function SurahScreenContent() {
     hasVerses: !!surah.verses,
     versesCount: surah.verses?.length || 0,
     firstVerse: surah.verses?.[0],
-    firstVerseText: surah.verses?.[0]?.text_uthmani?.substring(0, 50)
+    firstVerseText: surah.verses?.[0]?.text_uthmani?.substring(0, 50),
+    firstVerseKeys: surah.verses?.[0] ? Object.keys(surah.verses[0]) : [],
+    sampleVerses: surah.verses?.slice(0, 3).map((v: any) => ({
+      verse_number: v.verse_number,
+      text_uthmani: v.text_uthmani?.substring(0, 30),
+      hasArabicText: v.text_uthmani && /[\u0600-\u06FF]/.test(v.text_uthmani)
+    }))
   });
   
   const handlePlayWholeSurah = async () => {
