@@ -152,9 +152,11 @@ export default function SurahsScreen() {
               <Text style={styles.retryText}>Retry</Text>
             </TouchableOpacity>
           </View>
-        ) : filteredSurahs.map((surah, index) => (
+        ) : filteredSurahs.map((surah, index) => {
+          const surahKey = `surah-${surah.id || surah.number || index}`;
+          return (
           <TouchableOpacity
-            key={surah.id || surah.number || index}
+            key={surahKey}
             style={styles.surahCard}
             onPress={() => router.push(`/surah/${surah.id || surah.number}` as any)}
             activeOpacity={0.8}
@@ -202,7 +204,8 @@ export default function SurahsScreen() {
               </LinearGradient>
             </TouchableOpacity>
           </TouchableOpacity>
-        ))}
+          );
+        })}
         
         <View style={styles.footer}>
           <Text style={styles.footerText}>&quot;Read in the name of your Lord who created&quot;</Text>

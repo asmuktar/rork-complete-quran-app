@@ -159,7 +159,7 @@ class QuranApiService {
         };
         
         // Validate that we have Arabic text
-        const hasArabicText = normalizedData.ayahs.some(ayah => ayah.text && ayah.text.trim().length > 0);
+        const hasArabicText = normalizedData.ayahs.some((ayah: any) => ayah.text && ayah.text.trim().length > 0);
         if (!hasArabicText) {
           console.warn(`No Arabic text found in Quran.com response for surah ${surahNumber}`);
           throw new Error('No Arabic text in response');
@@ -217,7 +217,7 @@ class QuranApiService {
           };
           
           // Validate that we have Arabic text
-          const hasArabicText = normalizedData.ayahs.some(ayah => ayah.text && ayah.text.trim().length > 0);
+          const hasArabicText = normalizedData.ayahs.some((ayah: any) => ayah.text && ayah.text.trim().length > 0);
           if (hasArabicText) {
             await cacheService.set('quran_ayahs', cacheKey, normalizedData);
             console.log(`Successfully fetched surah ${surahNumber} with ${normalizedData.ayahs.length} ayahs from AlQuran.cloud`);
@@ -262,7 +262,7 @@ class QuranApiService {
         };
         
         // Validate that we have Arabic text
-        const hasArabicText = normalizedData.ayahs.some(ayah => ayah.text && ayah.text.trim().length > 0);
+        const hasArabicText = normalizedData.ayahs.some((ayah: any) => ayah.text && ayah.text.trim().length > 0);
         if (hasArabicText) {
           await cacheService.set('quran_ayahs', cacheKey, normalizedData);
           console.log(`Successfully fetched surah ${surahNumber} with ${normalizedData.ayahs.length} ayahs from simple API`);
