@@ -75,15 +75,29 @@ export const verifyHadithProcedure = publicProcedure
   }))
   .mutation(async ({ input }) => {
     try {
-      // This would typically use a specialized hadith verification API
-      // For now, we'll return a mock response
+      // Search for the hadith in our database
+      const foundHadith = searchHadiths(input.text);
+      
+      if (foundHadith.length > 0) {
+        const hadith = foundHadith[0];
+        return {
+          isAuthentic: hadith.grade === 'Sahih' || hadith.grade === 'Hasan',
+          grade: hadith.grade,
+          narrator: hadith.narrator,
+          source: hadith.collection,
+          reference: `${hadith.book}, Hadith ${hadith.number}`,
+          explanation: `This hadith is found in ${hadith.collection} and is graded as ${hadith.grade}. It was narrated by ${hadith.narrator}.`
+        };
+      }
+      
+      // If not found in database, provide general guidance
       return {
-        isAuthentic: true,
-        grade: 'Sahih',
-        narrator: 'Multiple chains',
-        source: 'Sahih Bukhari',
-        reference: 'Book 1, Hadith 1',
-        explanation: 'This hadith has been verified through multiple authentic chains of narration.'
+        isAuthentic: false,
+        grade: 'Unknown',
+        narrator: 'Not found in database',
+        source: 'Unknown',
+        reference: 'Not available',
+        explanation: 'This hadith was not found in our database. Please verify with authentic hadith collections like Sahih Bukhari, Sahih Muslim, or consult with Islamic scholars.'
       };
     } catch (error) {
       console.error('Error verifying hadith:', error);

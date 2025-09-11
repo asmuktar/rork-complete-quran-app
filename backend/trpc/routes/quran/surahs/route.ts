@@ -61,15 +61,21 @@ export const getSurahProcedure = publicProcedure
   });
 
 export const getAllVersesWithTranslationsProcedure = publicProcedure
-  .query(async () => {
-    console.log('Fetching sample verses with translations...');
+  .input(z.object({ 
+    limit: z.number().optional().default(100),
+    offset: z.number().optional().default(0)
+  }))
+  .query(async ({ input }) => {
+    console.log(`Fetching verses with translations (limit: ${input.limit}, offset: ${input.offset})...`);
     
     try {
-      // Fetch first 5 surahs as sample data to avoid overwhelming the API
-      const sampleSurahs = [1, 2, 3, 112, 113, 114]; // Al-Fatihah, Al-Baqarah, Ali Imran, and last 3 surahs
+      // Calculate which surahs to fetch based on offset and limit
+      const startSurah = Math.floor(input.offset / 50) + 1; // Rough estimate
+      const endSurah = Math.min(startSurah + 10, 114); // Fetch up to 10 surahs at a time
+      
       const allVerses: any[] = [];
       
-      for (const surahId of sampleSurahs) {
+      for (let surahId = startSurah; surahId <= endSurah && allVerses.length < input.limit; surahId++) {
         try {
           const surahData = await quranApi.getSurah(surahId);
           if (surahData && surahData.ayahs) {
@@ -83,7 +89,14 @@ export const getAllVersesWithTranslationsProcedure = publicProcedure
                 text: ayah.translation
               }] : []
             }));
-            allVerses.push(...verses);
+            
+            // Apply offset and limit
+            const startIndex = Math.max(0, input.offset - allVerses.length);
+            const endIndex = Math.min(verses.length, input.limit - allVerses.length + startIndex);
+            
+            if (startIndex < verses.length) {
+              allVerses.push(...verses.slice(startIndex, endIndex));
+            }
           }
         } catch (error) {
           console.error(`Error fetching surah ${surahId}:`, error);
@@ -91,7 +104,7 @@ export const getAllVersesWithTranslationsProcedure = publicProcedure
         }
       }
       
-      console.log(`Successfully fetched ${allVerses.length} sample verses`);
+      console.log(`Successfully fetched ${allVerses.length} verses`);
       return allVerses;
     } catch (error) {
       console.error('Error fetching verses:', error);

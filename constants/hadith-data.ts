@@ -28,7 +28,7 @@ export const HADITH_COLLECTIONS: HadithCollection[] = [
     name: 'Sahih al-Bukhari',
     arabicName: 'صحيح البخاري',
     compiler: 'Imam al-Bukhari',
-    totalHadiths: 7563,
+    totalHadiths: 33, // Updated to reflect actual available hadiths
     description: 'The most authentic collection of Hadith after the Quran',
     authenticity: 'Sahih',
     available: true
@@ -38,7 +38,7 @@ export const HADITH_COLLECTIONS: HadithCollection[] = [
     name: 'Sahih Muslim',
     arabicName: 'صحيح مسلم',
     compiler: 'Imam Muslim',
-    totalHadiths: 7190,
+    totalHadiths: 10, // Updated to reflect actual available hadiths
     description: 'Second most authentic collection after Bukhari',
     authenticity: 'Sahih',
     available: true
@@ -48,7 +48,7 @@ export const HADITH_COLLECTIONS: HadithCollection[] = [
     name: 'Sunan Abu Dawud',
     arabicName: 'سنن أبي داود',
     compiler: 'Abu Dawud',
-    totalHadiths: 5274,
+    totalHadiths: 2, // Updated to reflect actual available hadiths
     description: 'Focus on legal and practical matters of Islam',
     authenticity: 'Mixed',
     available: true
@@ -58,7 +58,7 @@ export const HADITH_COLLECTIONS: HadithCollection[] = [
     name: 'Jami at-Tirmidhi',
     arabicName: 'جامع الترمذي',
     compiler: 'At-Tirmidhi',
-    totalHadiths: 3956,
+    totalHadiths: 2, // Updated to reflect actual available hadiths
     description: 'Known for grading authenticity of hadiths',
     authenticity: 'Mixed',
     available: true
@@ -68,7 +68,7 @@ export const HADITH_COLLECTIONS: HadithCollection[] = [
     name: 'Sunan an-Nasa\'i',
     arabicName: 'سنن النسائي',
     compiler: 'An-Nasa\'i',
-    totalHadiths: 5761,
+    totalHadiths: 2, // Updated to reflect actual available hadiths
     description: 'Strict criteria for hadith acceptance',
     authenticity: 'Mixed',
     available: true
@@ -78,7 +78,7 @@ export const HADITH_COLLECTIONS: HadithCollection[] = [
     name: 'Sunan Ibn Majah',
     arabicName: 'سنن ابن ماجه',
     compiler: 'Ibn Majah',
-    totalHadiths: 4341,
+    totalHadiths: 2, // Updated to reflect actual available hadiths
     description: 'Completes the six major collections (Kutub as-Sittah)',
     authenticity: 'Mixed',
     available: true
@@ -88,7 +88,7 @@ export const HADITH_COLLECTIONS: HadithCollection[] = [
     name: 'Muwatta Malik',
     arabicName: 'موطأ مالك',
     compiler: 'Imam Malik',
-    totalHadiths: 1720,
+    totalHadiths: 2, // Updated to reflect actual available hadiths
     description: 'Earliest surviving collection of hadith',
     authenticity: 'Sahih',
     available: true
@@ -98,7 +98,7 @@ export const HADITH_COLLECTIONS: HadithCollection[] = [
     name: 'Musnad Ahmad',
     arabicName: 'مسند أحمد',
     compiler: 'Ahmad ibn Hanbal',
-    totalHadiths: 26363,
+    totalHadiths: 2, // Updated to reflect actual available hadiths
     description: 'Largest collection of hadiths by narrator',
     authenticity: 'Mixed',
     available: true
@@ -556,54 +556,23 @@ export const getCollectionById = (id: string): HadithCollection | undefined => {
 export const getHadithsByCollection = (collectionId: string, page: number = 1, limit: number = 50): { hadiths: Hadith[], hasMore: boolean, total: number } => {
   console.log(`Getting hadiths for collection: ${collectionId}, page: ${page}, limit: ${limit}`);
   
-  const collection = HADITH_COLLECTIONS.find(c => c.id === collectionId);
-  const totalHadiths = collection?.totalHadiths || 100;
-  
-  // Get real hadiths from database
+  // Get real hadiths from database for the specified collection
   const realHadiths = HADITH_DATABASE.filter(hadith => hadith.collection === collectionId);
   realHadiths.sort((a, b) => a.number - b.number);
   
-  console.log(`Found ${realHadiths.length} real hadiths for collection ${collectionId}`);
-  
-  // Create a complete sequential collection
-  const allHadiths: Hadith[] = [];
-  
-  // Add all hadiths sequentially from 1 to totalHadiths (limited to 500 for performance)
-  const maxHadiths = Math.min(totalHadiths, 500);
-  
-  for (let i = 1; i <= maxHadiths; i++) {
-    // Check if we have a real hadith for this number
-    const realHadith = realHadiths.find(h => h.number === i);
-    
-    if (realHadith) {
-      // Use the real hadith
-      allHadiths.push(realHadith);
-    } else {
-      // Generate a placeholder hadith with sequential number
-      allHadiths.push({
-        id: Date.now() + Math.random() + i,
-        number: i,
-        arab: 'حديث شريف من المجموعة',
-        translation: `Hadith ${i} from ${collection?.name || collectionId}. This is an authentic hadith that teaches us important Islamic principles and guidance for daily life. Each hadith provides valuable wisdom for Muslims to follow in their spiritual journey.`,
-        narrator: 'Authentic Chain of Narrators (RA)',
-        grade: collection?.authenticity === 'Sahih' ? 'Sahih' : 'Hasan',
-        book: `Book of ${collection?.name || 'Islamic Teachings'}`,
-        chapter: `Chapter ${Math.ceil(i / 20)} - Islamic Guidance`,
-        collection: collectionId,
-        keywords: ['hadith', 'islamic', 'teaching', 'guidance', 'authentic']
-      });
-    }
-  }
+  console.log(`Found ${realHadiths.length} authentic hadiths for collection ${collectionId}`);
   
   const startIndex = (page - 1) * limit;
   const endIndex = startIndex + limit;
   
-  console.log(`Returning hadiths ${startIndex + 1}-${Math.min(endIndex, allHadiths.length)} of ${allHadiths.length} total`);
+  const paginatedHadiths = realHadiths.slice(startIndex, endIndex);
+  
+  console.log(`Returning hadiths ${startIndex + 1}-${Math.min(endIndex, realHadiths.length)} of ${realHadiths.length} total`);
   
   return {
-    hadiths: allHadiths.slice(startIndex, endIndex),
-    hasMore: endIndex < allHadiths.length,
-    total: allHadiths.length
+    hadiths: paginatedHadiths,
+    hasMore: endIndex < realHadiths.length,
+    total: realHadiths.length
   };
 };
 
