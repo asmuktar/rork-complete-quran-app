@@ -120,13 +120,15 @@ export function useAudioPlayer(): AudioPlayerState & AudioPlayerActions {
       const paddedSurah = surahNumber.toString().padStart(3, '0');
       const paddedAyah = ayahNumber.toString().padStart(3, '0');
       
+      // Try different reciters as fallbacks
       const fallbackUrls = [
         `https://everyayah.com/data/Alafasy_128kbps/${paddedSurah}${paddedAyah}.mp3`,
-        `https://www.everyayah.com/data/Alafasy_128kbps/${paddedSurah}${paddedAyah}.mp3`,
-        `https://everyayah.com/data/Abu_Bakr_Al-Shatri_128kbps/${paddedSurah}${paddedAyah}.mp3`
+        `https://everyayah.com/data/Abu_Bakr_Al-Shatri_128kbps/${paddedSurah}${paddedAyah}.mp3`,
+        `https://everyayah.com/data/Saad_Al-Ghamdi_128kbps/${paddedSurah}${paddedAyah}.mp3`,
+        `https://www.everyayah.com/data/Alafasy_128kbps/${paddedSurah}${paddedAyah}.mp3`
       ];
       
-      console.log('🔄 Using fallback URLs:', fallbackUrls[0]);
+      console.log('🔄 Using fallback URL:', fallbackUrls[0]);
       return fallbackUrls[0];
     }
   }, []);
@@ -250,14 +252,22 @@ export function useAudioPlayer(): AudioPlayerState & AudioPlayerActions {
           audio.onerror = (error: any) => {
             console.error('🌐 Web audio error:', error, 'URL:', url);
             
-            // Try to get a fallback URL and retry
+            // Try multiple fallback URLs
             const paddedSurah = state.currentSurah?.toString().padStart(3, '0') || '001';
             const paddedAyah = state.currentAyah?.toString().padStart(3, '0') || '001';
-            const fallbackUrl = `https://www.everyayah.com/data/Alafasy_128kbps/${paddedSurah}${paddedAyah}.mp3`;
             
-            if (url !== fallbackUrl) {
-              console.log('🔄 Trying fallback URL:', fallbackUrl);
-              audio.src = fallbackUrl;
+            const fallbackUrls = [
+              `https://everyayah.com/data/Alafasy_128kbps/${paddedSurah}${paddedAyah}.mp3`,
+              `https://everyayah.com/data/Abu_Bakr_Al-Shatri_128kbps/${paddedSurah}${paddedAyah}.mp3`,
+              `https://www.everyayah.com/data/Alafasy_128kbps/${paddedSurah}${paddedAyah}.mp3`
+            ];
+            
+            // Find a fallback URL that hasn't been tried yet
+            const nextFallback = fallbackUrls.find(fallbackUrl => fallbackUrl !== url);
+            
+            if (nextFallback) {
+              console.log('🔄 Trying fallback URL:', nextFallback);
+              audio.src = nextFallback;
               audio.load();
               return;
             }
@@ -266,7 +276,7 @@ export function useAudioPlayer(): AudioPlayerState & AudioPlayerActions {
               ...prev, 
               isLoading: false, 
               isPlaying: false,
-              error: 'Audio not available for this reciter' 
+              error: 'Audio not available - please check your internet connection' 
             }));
             reject(error);
           };
@@ -276,25 +286,58 @@ export function useAudioPlayer(): AudioPlayerState & AudioPlayerActions {
           audio.preload = 'auto';
           audio.crossOrigin = 'anonymous';
           
-          audio.play().catch((playError: any) => {
-            console.error('🌐 Web play error:', playError);
-            setState(prev => ({ 
-              ...prev, 
-              isLoading: false, 
-              isPlaying: false,
-              error: 'Audio playback failed - please check your internet connection' 
-            }));
-            reject(playError);
-          });
+          // Add a small delay before playing to ensure audio is ready
+          setTimeout(() => {
+            audio.play().catch((playError: any) => {
+              console.error('🌐 Web play error:', playError);
+              setState(prev => ({ 
+                ...prev, 
+                isLoading: false, 
+                isPlaying: false,
+                error: 'Audio playback failed - please check your internet connection' 
+              }));
+              reject(playError);
+            });
+          }, 100);
         });
       } else {
-        const { sound } = await Audio.Sound.createAsync(
-          { uri: url },
-          { shouldPlay: true, isLooping: false, volume: 1.0 }
-        );
+        // Add retry logic for mobile audio
+        let sound: Audio.Sound | null = null;
+        let lastError: Error | null = null;
+        
+        // Try multiple times with different URLs if needed
+        const paddedSurah = state.currentSurah?.toString().padStart(3, '0') || '001';
+        const paddedAyah = state.currentAyah?.toString().padStart(3, '0') || '001';
+        
+        const urlsToTry = [
+          url,
+          `https://everyayah.com/data/Alafasy_128kbps/${paddedSurah}${paddedAyah}.mp3`,
+          `https://everyayah.com/data/Abu_Bakr_Al-Shatri_128kbps/${paddedSurah}${paddedAyah}.mp3`
+        ];
+        
+        for (const tryUrl of urlsToTry) {
+          try {
+            console.log(`📱 Trying mobile audio URL: ${tryUrl}`);
+            const { sound: createdSound } = await Audio.Sound.createAsync(
+              { uri: tryUrl },
+              { shouldPlay: true, isLooping: false, volume: 1.0 }
+            );
+            sound = createdSound;
+            console.log(`📱 Successfully created mobile audio from: ${tryUrl}`);
+            break;
+          } catch (error) {
+            console.warn(`📱 Failed to create audio from ${tryUrl}:`, error);
+            lastError = error instanceof Error ? error : new Error('Audio creation failed');
+            continue;
+          }
+        }
+        
+        if (!sound) {
+          throw lastError || new Error('All audio URLs failed');
+        }
         
         soundRef.current = sound;
-        console.log('Mobile audio created and playing');
+        console.log('📱 Mobile audio created and playing');
 
         // Wait for the sound to finish playing
         return new Promise((resolve) => {
@@ -307,7 +350,7 @@ export function useAudioPlayer(): AudioPlayerState & AudioPlayerActions {
               }));
 
               if (status.didJustFinish) {
-                console.log('Mobile audio finished');
+                console.log('📱 Mobile audio finished');
                 setState(prev => ({ ...prev, isPlaying: false }));
                 if (shouldTriggerNext) {
                   setTimeout(() => {
@@ -317,7 +360,7 @@ export function useAudioPlayer(): AudioPlayerState & AudioPlayerActions {
                 resolve();
               }
             } else if (status.error) {
-              console.error('Mobile audio error:', status.error);
+              console.error('📱 Mobile audio error:', status.error);
               setState(prev => ({ 
                 ...prev, 
                 isLoading: false, 

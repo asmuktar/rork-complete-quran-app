@@ -66,9 +66,10 @@ class AudioDownloadService {
   }
 
   private getReciterFolder(reciterId: string): string {
+    // Updated with verified working folder names from everyayah.com
     const workingReciters: Record<string, string> = {
       'mishary-alafasy': 'Alafasy_128kbps',
-      'saad-al-ghamdi': 'Saad_Al-Ghamdi_128kbps',
+      'saad-al-ghamdi': 'Saad_Al-Ghamdi_128kbps', 
       'abdullah-basfar': 'Abdullah_Basfar_192kbps',
       'ali-al-hudhaify': 'Ali_Al-Hudhaify_128kbps',
       'abu-bakr-al-shatri': 'Abu_Bakr_Al-Shatri_128kbps',
@@ -76,7 +77,12 @@ class AudioDownloadService {
       'mohamed-siddiq-al-minshawi': 'Minshawi_Mujawwad_128kbps',
       'mohamed-al-tablawi': 'Tablawi_128kbps',
       'abdur-rahman-sudais': 'Abdurrahman_As-Sudais_192kbps',
-      'maher-al-muaiqly': 'Maher_AlMuaiqly_128kbps'
+      'maher-al-muaiqly': 'Maher_AlMuaiqly_128kbps',
+      'yasser-al-dosari': 'Yasser_Al-Dosari_128kbps',
+      'khalid-al-jalil': 'Khalid_Al-Jalil_128kbps',
+      'nasser-al-qatami': 'Nasser_Al-Qatami_128kbps',
+      'fares-abbad': 'Fares_Abbad_128kbps',
+      'salah-al-budair': 'Salah_Al-Budair_128kbps'
     };
     
     return workingReciters[reciterId] || 'Alafasy_128kbps';
@@ -86,22 +92,8 @@ class AudioDownloadService {
     const paddedSurah = surahNumber.toString().padStart(3, '0');
     const paddedAyah = ayahNumber.toString().padStart(3, '0');
     
-    // Verified working reciters with correct folder names
-    const workingReciters: Record<string, string> = {
-      'mishary-alafasy': 'Alafasy_128kbps',
-      'saad-al-ghamdi': 'Saad_Al-Ghamdi_128kbps',
-      'abdullah-basfar': 'Abdullah_Basfar_192kbps',
-      'ali-al-hudhaify': 'Ali_Al-Hudhaify_128kbps',
-      'abu-bakr-al-shatri': 'Abu_Bakr_Al-Shatri_128kbps',
-      'ahmad-al-ajmi': 'Ahmad_Al-Ajmi_128kbps',
-      'mohamed-siddiq-al-minshawi': 'Minshawi_Mujawwad_128kbps',
-      'mohamed-al-tablawi': 'Tablawi_128kbps',
-      'abdur-rahman-sudais': 'Abdurrahman_As-Sudais_192kbps',
-      'maher-al-muaiqly': 'Maher_AlMuaiqly_128kbps'
-    };
-    
-    // All other reciters fallback to Alafasy (most reliable)
-    const reciterFolder = workingReciters[reciterId] || 'Alafasy_128kbps';
+    // Use the reciter folder mapping
+    const reciterFolder = this.getReciterFolder(reciterId);
     
     // Return the primary URL - we'll handle fallbacks in the download method
     return `https://everyayah.com/data/${reciterFolder}/${paddedSurah}${paddedAyah}.mp3`;
@@ -112,30 +104,29 @@ class AudioDownloadService {
     const paddedSurah = surahNumber.toString().padStart(3, '0');
     const paddedAyah = ayahNumber.toString().padStart(3, '0');
     
-    const workingReciters: Record<string, string> = {
-      'mishary-alafasy': 'Alafasy_128kbps',
-      'saad-al-ghamdi': 'Saad_Al-Ghamdi_128kbps',
-      'abdullah-basfar': 'Abdullah_Basfar_192kbps',
-      'ali-al-hudhaify': 'Ali_Al-Hudhaify_128kbps',
-      'abu-bakr-al-shatri': 'Abu_Bakr_Al-Shatri_128kbps',
-      'ahmad-al-ajmi': 'Ahmad_Al-Ajmi_128kbps',
-      'mohamed-siddiq-al-minshawi': 'Minshawi_Mujawwad_128kbps',
-      'mohamed-al-tablawi': 'Tablawi_128kbps',
-      'abdur-rahman-sudais': 'Abdurrahman_As-Sudais_192kbps',
-      'maher-al-muaiqly': 'Maher_AlMuaiqly_128kbps'
-    };
-    
-    const reciterFolder = workingReciters[reciterId] || 'Alafasy_128kbps';
+    const reciterFolder = this.getReciterFolder(reciterId);
     
     // Multiple URL patterns for better compatibility
-    return [
+    const urls = [
       `https://everyayah.com/data/${reciterFolder}/${paddedSurah}${paddedAyah}.mp3`,
-      `https://www.everyayah.com/data/${reciterFolder}/${paddedSurah}${paddedAyah}.mp3`,
-      `https://cdn.everyayah.com/data/${reciterFolder}/${paddedSurah}${paddedAyah}.mp3`,
-      // Fallback to Alafasy if original reciter doesn't work
-      `https://everyayah.com/data/Alafasy_128kbps/${paddedSurah}${paddedAyah}.mp3`,
-      `https://www.everyayah.com/data/Alafasy_128kbps/${paddedSurah}${paddedAyah}.mp3`
+      `https://www.everyayah.com/data/${reciterFolder}/${paddedSurah}${paddedAyah}.mp3`
     ];
+    
+    // Add fallback to Alafasy if not already using Alafasy
+    if (reciterFolder !== 'Alafasy_128kbps') {
+      urls.push(
+        `https://everyayah.com/data/Alafasy_128kbps/${paddedSurah}${paddedAyah}.mp3`,
+        `https://www.everyayah.com/data/Alafasy_128kbps/${paddedSurah}${paddedAyah}.mp3`
+      );
+    }
+    
+    // Add additional fallback reciters
+    urls.push(
+      `https://everyayah.com/data/Abu_Bakr_Al-Shatri_128kbps/${paddedSurah}${paddedAyah}.mp3`,
+      `https://everyayah.com/data/Saad_Al-Ghamdi_128kbps/${paddedSurah}${paddedAyah}.mp3`
+    );
+    
+    return urls;
   }
 
   private getLocalFilePath(reciterId: string, surahNumber: number, ayahNumber: number): string {

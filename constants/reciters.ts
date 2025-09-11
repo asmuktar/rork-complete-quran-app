@@ -20,33 +20,6 @@ export interface Reciter {
 
 export const TOP_RECITERS: Reciter[] = [
   {
-    id: 'almatroud',
-    name: 'Sheikh Almatroud',
-    arabicName: 'الشيخ المطرود',
-    country: 'Saudi Arabia',
-    description: 'Beautiful and clear recitation with perfect Tajweed',
-    biography: 'Sheikh Almatroud is a renowned Saudi Qari known for his beautiful and clear recitation. He has a distinctive voice that combines clarity with emotional depth.',
-    recitationStyle: 'Clear and beautiful',
-    audioQuality: '192kbps',
-    sampleAyahs: [
-      {
-        surah: 1,
-        ayah: 1,
-        text: 'بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ',
-        translation: 'In the name of Allah, the Entirely Merciful, the Especially Merciful.'
-      },
-      {
-        surah: 2,
-        ayah: 255,
-        text: 'اللَّهُ لَا إِلَٰهَ إِلَّا هُوَ الْحَيُّ الْقَيُّومُ',
-        translation: 'Allah - there is no deity except Him, the Ever-Living, the Sustainer of existence.'
-      }
-    ],
-    audioUrl: 'https://everyayah.com/data/Almatroud_128kbps/',
-    popularity: 100,
-    specialties: ['Clear recitation', 'Perfect Tajweed', 'Beautiful voice']
-  },
-  {
     id: 'mishary-alafasy',
     name: 'Mishary Rashid Alafasy',
     arabicName: 'مشاري بن راشد العفاسي',
@@ -54,7 +27,7 @@ export const TOP_RECITERS: Reciter[] = [
     description: 'Melodious and clear recitation with beautiful voice',
     biography: 'Sheikh Mishary Rashid Alafasy is a renowned Kuwaiti Qari born in 1976. He is known for his melodious voice and precise recitation. He has memorized the Quran and is also an Islamic preacher and Imam.',
     recitationStyle: 'Melodious with perfect Tajweed',
-    audioQuality: '192kbps',
+    audioQuality: '128kbps',
     sampleAyahs: [
       {
         surah: 1,
@@ -70,8 +43,8 @@ export const TOP_RECITERS: Reciter[] = [
       }
     ],
     audioUrl: 'https://everyayah.com/data/Alafasy_128kbps/',
-    popularity: 99,
-    specialties: ['Melodious recitation', 'Perfect Tajweed', 'Emotional delivery']
+    popularity: 100,
+    specialties: ['Clear recitation', 'Perfect Tajweed', 'Beautiful voice']
   },
   {
     id: 'abdur-rahman-sudais',
