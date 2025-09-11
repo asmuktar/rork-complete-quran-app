@@ -29,6 +29,17 @@ export const getSurahProcedure = publicProcedure
       }
       
       console.log(`Successfully fetched surah ${input.id} with ${surahData.ayahs.length} verses`);
+      console.log(`First ayah text sample:`, surahData.ayahs[0]?.text?.substring(0, 50));
+      
+      // Validate Arabic text exists
+      const hasValidArabicText = surahData.ayahs.some((ayah: any) => 
+        ayah.text && ayah.text.trim().length > 0 && /[\u0600-\u06FF]/.test(ayah.text)
+      );
+      
+      if (!hasValidArabicText) {
+        console.warn(`No valid Arabic text found for surah ${input.id}`);
+        throw new Error(`No valid Arabic text found for surah ${input.id}`);
+      }
       
       // Transform to expected format
       return {
@@ -43,20 +54,20 @@ export const getSurahProcedure = publicProcedure
           id: ayah.number,
           verse_number: ayah.numberInSurah,
           verse_key: `${input.id}:${ayah.numberInSurah}`,
-          text_uthmani: ayah.text,
+          text_uthmani: ayah.text || '',
           translations: ayah.translation ? [{
             id: 131,
             text: ayah.translation
           }] : [],
-          juz_number: ayah.juz,
-          hizb_number: ayah.hizb,
-          page_number: ayah.page,
+          juz_number: ayah.juz || 1,
+          hizb_number: ayah.hizb || 1,
+          page_number: ayah.page || 1,
           sajda_number: ayah.sajda ? 1 : null
         }))
       };
     } catch (error) {
       console.error(`Error fetching surah ${input.id}:`, error);
-      throw new Error(`Failed to fetch surah ${input.id} from API`);
+      throw new Error(`Failed to fetch surah ${input.id} from API: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   });
 

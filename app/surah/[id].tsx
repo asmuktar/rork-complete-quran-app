@@ -14,6 +14,7 @@ import { useBookmarks } from '@/contexts/bookmark-context';
 import MemoryTestModal from '@/components/MemoryTestModal';
 import NetworkStatus from '@/components/NetworkStatus';
 import offlineService from '@/services/offline-service';
+import cacheService from '@/services/cache-service';
 
 function SurahScreenContent() {
   const { id } = useLocalSearchParams();
@@ -120,9 +121,27 @@ function SurahScreenContent() {
     return (
       <SafeAreaView style={styles.container}>
         <Text style={styles.errorText}>Error loading surah: {surahQuery.error?.message || 'Unknown error'}</Text>
+        <TouchableOpacity 
+          style={styles.debugButton}
+          onPress={async () => {
+            console.log('Clearing Quran cache...');
+            await cacheService.clearQuranCache();
+            surahQuery.refetch();
+          }}
+        >
+          <Text style={styles.debugButtonText}>Clear Cache & Retry</Text>
+        </TouchableOpacity>
       </SafeAreaView>
     );
   }
+  
+  // Debug: Log the surah data structure
+  console.log('Surah data structure:', {
+    hasVerses: !!surah.verses,
+    versesCount: surah.verses?.length || 0,
+    firstVerse: surah.verses?.[0],
+    firstVerseText: surah.verses?.[0]?.text_uthmani?.substring(0, 50)
+  });
   
   const handlePlayWholeSurah = async () => {
     try {
@@ -472,8 +491,15 @@ function SurahScreenContent() {
               </View>
               
               <Text style={styles.ayahArabicText}>
-                {ayah.text_uthmani}
+                {ayah.text_uthmani || 'No Arabic text available'}
               </Text>
+              
+              {/* Debug info */}
+              {!ayah.text_uthmani && (
+                <Text style={styles.debugText}>
+                  Debug: text_uthmani is empty. Available fields: {Object.keys(ayah).join(', ')}
+                </Text>
+              )}
               
               <Text style={styles.ayahTranslation}>{ayah.translations?.[0]?.text || ''}</Text>
               
@@ -900,6 +926,28 @@ const styles = StyleSheet.create({
     color: Colors.textOnPrimary,
     fontSize: 14,
     fontWeight: 'bold',
+  },
+  debugButton: {
+    backgroundColor: Colors.primary,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginTop: 20,
+    alignSelf: 'center',
+  },
+  debugButtonText: {
+    color: Colors.textOnPrimary,
+    fontWeight: '600',
+    fontSize: 16,
+  },
+  debugText: {
+    fontSize: 12,
+    color: Colors.error,
+    fontStyle: 'italic',
+    marginBottom: 8,
+    backgroundColor: Colors.surfaceVariant,
+    padding: 8,
+    borderRadius: 4,
   },
 });
 

@@ -300,6 +300,17 @@ class CacheService {
     }
   }
 
+  async clearQuranCache(): Promise<void> {
+    try {
+      await this.invalidate('quran_ayahs');
+      await this.invalidate('quran_surahs');
+      await this.invalidate('quran_search');
+      console.log('✅ Cleared all Quran cache');
+    } catch (error) {
+      console.error('Error clearing Quran cache:', error);
+    }
+  }
+
   // Batch operations for better performance
   async getMultiple<T>(cacheType: string, keys: string[]): Promise<Record<string, T | null>> {
     const results: Record<string, T | null> = {};
