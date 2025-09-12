@@ -1,19 +1,19 @@
-import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import { View, Text, StyleSheet, TextInput, ScrollView, TouchableOpacity, Platform, Alert, Dimensions, Animated } from 'react-native';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import { View, Text, StyleSheet, TextInput, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Search, Mic, MicOff, Volume2, BookOpen, User, Loader, Play, Pause, StopCircle, SkipForward, Download, CheckCircle, Zap, Star, TrendingUp } from 'lucide-react-native';
+import { Search, Volume2, BookOpen, User, Loader, Play, Pause, StopCircle, Download, CheckCircle, Zap, Star, TrendingUp } from 'lucide-react-native';
 import { Colors } from '@/constants/colors';
-import { Audio } from 'expo-av';
+
 import { trpc } from '@/lib/trpc';
-import { SURAHS, searchSurahs } from '@/constants/quran-data';
+import { SURAHS } from '@/constants/quran-data';
 import { TOP_RECITERS, getReciterById } from '@/constants/reciters';
 import { useAudioPlayer } from '@/hooks/use-audio-player';
 import audioDownloadService from '@/services/audio-download-service';
 import offlineService from '@/services/offline-service';
 import { usePersonalization } from '@/contexts/personalization-context';
 
-const { width } = Dimensions.get('window');
+
 
 interface SearchResult {
   id: string;
@@ -43,12 +43,9 @@ interface SearchResult {
 export default function SearchScreen() {
   const { settings, fontSizeValue } = usePersonalization();
   const [searchQuery, setSearchQuery] = useState('');
-  const [isRecording, setIsRecording] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
-  const [recordingTime, setRecordingTime] = useState(0);
-  const [isProcessing, setIsProcessing] = useState(false);
   const [selectedReciter, setSelectedReciter] = useState(settings.defaultReciter.toString());
   const [downloadedReciters, setDownloadedReciters] = useState<string[]>([]);
   const [downloadProgress, setDownloadProgress] = useState<Record<string, number>>({});
@@ -600,7 +597,7 @@ export default function SearchScreen() {
     return () => clearInterval(interval);
   }, []);
 
-  const searchMutation = trpc.quran.searchVerses.useMutation({
+  const searchMutation = trpc.quran.search.useMutation({
     onSuccess: async (data) => {
       try {
         console.log('Search API response:', data);
@@ -648,40 +645,7 @@ export default function SearchScreen() {
     },
   });
   
-  const voiceSearchMutation = trpc.quran.voiceSearch.useMutation({
-    onSuccess: async (data) => {
-      try {
-        console.log('Voice search API response:', data);
-        const enhancedResults = await enhanceSearchResults(data || [], searchQuery);
-        setSearchResults(enhancedResults);
-        setIsProcessing(false);
-        setHasSearched(true);
-        
-        // Add to search history
-        if (searchQuery && searchQuery.trim() && !searchHistory.includes(searchQuery.toLowerCase())) {
-          setSearchHistory(prev => [searchQuery.toLowerCase(), ...prev.slice(0, 9)]);
-        }
-      } catch (error) {
-        console.error('Error processing voice search results:', error);
-        setSearchResults([]);
-        setIsProcessing(false);
-        setHasSearched(true);
-        Alert.alert('Voice Search Error', 'Failed to process voice search results. Please try again.');
-      }
-    },
-    onError: (error) => {
-      console.error('Voice search error:', error);
-      setSearchResults([]);
-      setIsProcessing(false);
-      setHasSearched(true);
-      Alert.alert('Voice Search Error', 'Could not understand the audio. Please try again.');
-    },
-  });
-  
-  const recordingRef = useRef<Audio.Recording | null>(null);
-  const pulseAnim = useRef(new Animated.Value(1)).current;
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
-  const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
+
   
   // Generate audio URL for specific ayah
   const getAyahAudioUrl = (surahNumber: number, ayahNumber: number, reciterId: string): string => {
@@ -695,68 +659,7 @@ export default function SearchScreen() {
     return `${reciter.audioUrl}${paddedSurah}${paddedAyah}.mp3`;
   };
   
-  // Auto-stop recording after 10 seconds
-  const RECORDING_DURATION = 10000;
-  
-  useEffect(() => {
-    if (isRecording) {
-      // Start pulse animation
-      const pulse = () => {
-        Animated.sequence([
-          Animated.timing(pulseAnim, {
-            toValue: 1.2,
-            duration: 500,
-            useNativeDriver: true,
-          }),
-          Animated.timing(pulseAnim, {
-            toValue: 1,
-            duration: 500,
-            useNativeDriver: true,
-          }),
-        ]).start(() => {
-          if (isRecording) pulse();
-        });
-      };
-      pulse();
-      
-      // Start recording timer
-      recordingTimerRef.current = setInterval(() => {
-        setRecordingTime(prev => {
-          if (prev >= RECORDING_DURATION / 1000) {
-            handleVoiceSearch(); // Auto-stop
-            return 0;
-          }
-          return prev + 1;
-        });
-      }, 1000) as any;
-      
-      // Auto-stop after duration
-      timerRef.current = setTimeout(() => {
-        if (isRecording) {
-          handleVoiceSearch();
-        }
-      }, RECORDING_DURATION) as any;
-    } else {
-      // Reset animation
-      pulseAnim.setValue(1);
-      setRecordingTime(0);
-      
-      if (recordingTimerRef.current) {
-        clearInterval(recordingTimerRef.current);
-        recordingTimerRef.current = null;
-      }
-      
-      if (timerRef.current) {
-        clearTimeout(timerRef.current);
-        timerRef.current = null;
-      }
-    }
-    
-    return () => {
-      if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
-      if (timerRef.current) clearTimeout(timerRef.current);
-    };
-  }, [isRecording, pulseAnim]);
+
 
   const performSearch = useCallback(async (query: string) => {
     if (!query.trim()) {
@@ -813,131 +716,7 @@ export default function SearchScreen() {
     }
   }, [searchMutation, isOnline, searchHistory, enhanceSearchResults]);
 
-  const handleVoiceSearch = useCallback(async () => {
-    if (isRecording) {
-      // Stop recording
-      setIsRecording(false);
-      setIsProcessing(true);
-      
-      try {
-        if (recordingRef.current) {
-          await recordingRef.current.stopAndUnloadAsync();
-          const uri = recordingRef.current.getURI();
-          
-          if (uri) {
-            // Process the audio with STT API
-            const formData = new FormData();
-            
-            if (Platform.OS === 'web') {
-              // Web implementation would need MediaRecorder API
-              Alert.alert('Voice Search', 'Voice search is not available on web. Please use text search.');
-              setIsProcessing(false);
-              return;
-            } else {
-              // Mobile implementation
-              const uriParts = uri.split('.');
-              const fileType = uriParts[uriParts.length - 1];
-              
-              const audioFile = {
-                uri,
-                name: `recording.${fileType}`,
-                type: `audio/${fileType}`
-              } as any;
-              
-              formData.append('audio', audioFile);
-            }
-            
-            try {
-              const response = await fetch('https://toolkit.rork.com/stt/transcribe/', {
-                method: 'POST',
-                body: formData,
-              });
-              
-              if (response.ok) {
-                const result = await response.json();
-                const transcribedText = result.text;
-                
-                if (transcribedText && transcribedText.trim()) {
-                  setSearchQuery(transcribedText);
-                  setHasSearched(true);
-                  // Use voice search mutation for better results
-                  voiceSearchMutation.mutate({ transcription: transcribedText });
-                } else {
-                  Alert.alert('Voice Search', 'Could not understand the audio. Please try again.');
-                  setIsProcessing(false);
-                }
-              } else {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-              }
-            } catch (fetchError) {
-              console.error('Fetch error:', fetchError);
-              throw new Error('Network error occurred');
-            }
-          }
-        }
-      } catch (error) {
-        console.error('Voice search error:', error);
-        Alert.alert('Voice Search Error', 'Failed to process voice search. Please try again.');
-      } finally {
-        setIsProcessing(false);
-        recordingRef.current = null;
-      }
-    } else {
-      // Start recording
-      try {
-        if (Platform.OS === 'web') {
-          Alert.alert('Voice Search', 'Voice search is not available on web. Please use text search.');
-          return;
-        }
-        
-        const { status } = await Audio.requestPermissionsAsync();
-        if (status !== 'granted') {
-          Alert.alert('Permission Required', 'Please grant microphone permission to use voice search.');
-          return;
-        }
-        
-        await Audio.setAudioModeAsync({
-          allowsRecordingIOS: true,
-          playsInSilentModeIOS: true,
-        });
-        
-        const recording = new Audio.Recording();
-        await recording.prepareToRecordAsync({
-          android: {
-            extension: '.m4a',
-            outputFormat: 2, // MPEG_4
-            audioEncoder: 3, // AAC
-            sampleRate: 44100,
-            numberOfChannels: 2,
-            bitRate: 128000,
-          },
-          ios: {
-            extension: '.wav',
-            outputFormat: 1, // LINEARPCM
-            audioQuality: 1, // HIGH
-            sampleRate: 44100,
-            numberOfChannels: 2,
-            bitRate: 128000,
-            linearPCMBitDepth: 16,
-            linearPCMIsBigEndian: false,
-            linearPCMIsFloat: false,
-          },
-          web: {
-            mimeType: 'audio/webm;codecs=opus',
-            bitsPerSecond: 128000,
-          },
-        });
-        
-        await recording.startAsync();
-        recordingRef.current = recording;
-        setIsRecording(true);
-        setRecordingTime(0);
-      } catch (error) {
-        console.error('Failed to start recording:', error);
-        Alert.alert('Recording Error', 'Failed to start voice recording. Please try again.');
-      }
-    }
-  }, [isRecording, performSearch]);
+
 
   const handleTextSearch = useCallback((text: string) => {
     setSearchQuery(text);
@@ -1226,7 +1005,7 @@ export default function SearchScreen() {
           <Search size={28} color={Colors.textOnPrimary} />
           <Text style={styles.title}>Ayat Search</Text>
           <Text style={styles.subtitle}>
-            {isOnline ? 'AI-Powered Voice & Text Search' : 'Offline Search Mode'}
+            {isOnline ? 'AI-Powered Text Search' : 'Offline Search Mode'}
           </Text>
         </View>
       </LinearGradient>
@@ -1248,23 +1027,6 @@ export default function SearchScreen() {
               autoCapitalize="none"
               autoCorrect={false}
             />
-            <TouchableOpacity
-              style={[
-                styles.micButton,
-                isRecording && styles.micButtonActive,
-                isLoading && styles.micButtonLoading,
-              ]}
-              onPress={handleVoiceSearch}
-              disabled={isLoading}
-            >
-              {isLoading ? (
-                <Loader size={20} color={Colors.textOnPrimary} />
-              ) : isRecording ? (
-                <MicOff size={20} color={Colors.textOnPrimary} />
-              ) : (
-                <Mic size={20} color={isRecording ? Colors.textOnPrimary : Colors.textLight} />
-              )}
-            </TouchableOpacity>
           </View>
           
           {/* Reciter Selection */}
@@ -1308,28 +1070,22 @@ export default function SearchScreen() {
               );
             })}
           </ScrollView>
-          
-          {isRecording && (
-            <View style={styles.recordingIndicator}>
-              <View style={styles.recordingDot} />
-              <Text style={styles.recordingText}>Listening... Speak now</Text>
-            </View>
-          )}
+
         </View>
       </View>
 
       {/* Results */}
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {(isLoading || isProcessing) && !isRecording && (
+        {isLoading && (
           <View style={styles.loadingContainer}>
             <Loader size={32} color={Colors.primary} />
             <Text style={styles.loadingText}>
-              {isProcessing ? 'Processing voice...' : isOnline ? 'Searching...' : 'Searching offline...'}
+              {isOnline ? 'Searching...' : 'Searching offline...'}
             </Text>
           </View>
         )}
 
-        {!isLoading && !isProcessing && !hasSearched && (
+        {!isLoading && !hasSearched && (
           <View style={styles.placeholderContainer}>
             <View style={styles.placeholderIcon}>
               <Search size={48} color={Colors.textLight} />
@@ -1337,7 +1093,6 @@ export default function SearchScreen() {
             <Text style={styles.placeholderTitle}>Search the Holy Quran</Text>
             <Text style={styles.placeholderText}>
               • Type to search verses, surahs, or reciters{"\n"}
-              • Use voice search by tapping the microphone{"\n"}
               • Search in Arabic or English{"\n"}
               {!isOnline && '• Currently in offline mode - limited content available'}
             </Text>
@@ -1380,7 +1135,7 @@ export default function SearchScreen() {
           </View>
         )}
 
-        {!isLoading && !isProcessing && hasSearched && searchResults.length === 0 && (
+        {!isLoading && hasSearched && searchResults.length === 0 && (
           <View style={styles.noResultsContainer}>
             <BookOpen size={48} color={Colors.textLight} />
             <Text style={styles.noResultsTitle}>No results found</Text>
@@ -1391,7 +1146,7 @@ export default function SearchScreen() {
           </View>
         )}
 
-        {!isLoading && !isProcessing && searchResults.length > 0 && (
+        {!isLoading && searchResults.length > 0 && (
           <View style={styles.resultsContainer}>
             <View style={styles.resultsHeaderRow}>
               <Text style={styles.resultsHeader}>

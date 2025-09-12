@@ -104,6 +104,9 @@ class QuranApiService {
           console.warn(`Failed to fetch translations for surah ${surahNumber}:`, error);
         }
         
+        // Remove Bismillah from first ayah for all surahs except Al-Fatihah (1) and At-Tawbah (9)
+        const bismillah = 'بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ';
+        
         const normalizedData = {
           number: surahNumber,
           name: data.data.name || '',
@@ -111,15 +114,26 @@ class QuranApiService {
           numberOfAyahs: data.data.numberOfAyahs || data.data.ayahs.length,
           ayahs: data.data.ayahs.map((ayah: any, index: number) => {
             const englishAyah = englishTranslations[index];
+            let ayahText = ayah.text || '';
+            
+            // For all surahs except Al-Fatihah (1) and At-Tawbah (9), remove Bismillah from first ayah
+            // Al-Fatihah includes Bismillah as its first verse
+            // At-Tawbah doesn't have Bismillah at all
+            if (surahNumber !== 1 && surahNumber !== 9 && ayah.numberInSurah === 1) {
+              // Remove Bismillah if it's at the beginning of the first ayah
+              if (ayahText.startsWith(bismillah)) {
+                ayahText = ayahText.substring(bismillah.length).trim();
+              }
+            }
             
             // Debug logging for first few ayahs
             if (index < 3) {
-              console.log(`Surah ${surahNumber}, Ayah ${ayah.numberInSurah}: "${ayah.text?.substring(0, 50)}..."`);
+              console.log(`Surah ${surahNumber}, Ayah ${ayah.numberInSurah}: "${ayahText.substring(0, 50)}..."`);
             }
             
             return {
               number: ayah.number,
-              text: ayah.text || '',
+              text: ayahText,
               numberInSurah: ayah.numberInSurah,
               translation: englishAyah?.text || '',
               juz: ayah.juz || 1,
@@ -219,6 +233,9 @@ class QuranApiService {
         const englishData = data.data.find((d: any) => d.edition?.identifier === 'en.sahih');
         
         if (arabicData && arabicData.ayahs && arabicData.ayahs.length > 0) {
+          // Remove Bismillah from first ayah for all surahs except Al-Fatihah (1) and At-Tawbah (9)
+          const bismillah = 'بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ';
+          
           const normalizedData = {
             number: surahNumber,
             name: arabicData.name || '',
@@ -226,9 +243,18 @@ class QuranApiService {
             numberOfAyahs: arabicData.numberOfAyahs || arabicData.ayahs.length,
             ayahs: arabicData.ayahs.map((ayah: any, index: number) => {
               const englishAyah = englishData?.ayahs?.[index];
+              let ayahText = ayah.text || '';
+              
+              // For all surahs except Al-Fatihah (1) and At-Tawbah (9), remove Bismillah from first ayah
+              if (surahNumber !== 1 && surahNumber !== 9 && ayah.numberInSurah === 1) {
+                if (ayahText.startsWith(bismillah)) {
+                  ayahText = ayahText.substring(bismillah.length).trim();
+                }
+              }
+              
               return {
                 number: ayah.number,
-                text: ayah.text || '',
+                text: ayahText,
                 numberInSurah: ayah.numberInSurah,
                 translation: englishAyah?.text || '',
                 juz: ayah.juz || 1,
