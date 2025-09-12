@@ -106,6 +106,8 @@ class QuranApiService {
         
         // Remove Bismillah from first ayah for all surahs except Al-Fatihah (1) and At-Tawbah (9)
         const bismillah = 'بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ';
+        const bismillahWithSpace = 'بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ ';
+        const bismillahVariant = 'بسم الله الرحمن الرحيم';
         
         const normalizedData = {
           number: surahNumber,
@@ -121,11 +123,23 @@ class QuranApiService {
             // At-Tawbah doesn't have Bismillah at all
             if (surahNumber !== 1 && surahNumber !== 9 && ayah.numberInSurah === 1) {
               // Remove Bismillah if it's at the beginning of the first ayah
-              if (ayahText.startsWith(bismillah)) {
-                console.log(`Removing Bismillah from Surah ${surahNumber}, Ayah 1`);
-                console.log(`Before: "${ayahText.substring(0, 100)}..."`);
+              const originalText = ayahText;
+              
+              // Try different Bismillah patterns
+              if (ayahText.startsWith(bismillahWithSpace)) {
+                ayahText = ayahText.substring(bismillahWithSpace.length).trim();
+                console.log(`Removed Bismillah (with space) from Surah ${surahNumber}, Ayah 1`);
+              } else if (ayahText.startsWith(bismillah)) {
                 ayahText = ayahText.substring(bismillah.length).trim();
-                console.log(`After: "${ayahText.substring(0, 100)}..."`);
+                console.log(`Removed Bismillah from Surah ${surahNumber}, Ayah 1`);
+              } else if (ayahText.startsWith(bismillahVariant)) {
+                ayahText = ayahText.substring(bismillahVariant.length).trim();
+                console.log(`Removed Bismillah (variant) from Surah ${surahNumber}, Ayah 1`);
+              }
+              
+              if (originalText !== ayahText) {
+                console.log(`Surah ${surahNumber} - Original first ayah: "${originalText.substring(0, 80)}..."`);
+                console.log(`Surah ${surahNumber} - Cleaned first ayah: "${ayahText.substring(0, 80)}..."`);
               }
             }
             
@@ -238,6 +252,8 @@ class QuranApiService {
         if (arabicData && arabicData.ayahs && arabicData.ayahs.length > 0) {
           // Remove Bismillah from first ayah for all surahs except Al-Fatihah (1) and At-Tawbah (9)
           const bismillah = 'بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ';
+          const bismillahWithSpace = 'بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ ';
+          const bismillahVariant = 'بسم الله الرحمن الرحيم';
           
           const normalizedData = {
             number: surahNumber,
@@ -250,9 +266,22 @@ class QuranApiService {
               
               // For all surahs except Al-Fatihah (1) and At-Tawbah (9), remove Bismillah from first ayah
               if (surahNumber !== 1 && surahNumber !== 9 && ayah.numberInSurah === 1) {
-                if (ayahText.startsWith(bismillah)) {
-                  console.log(`[Fallback] Removing Bismillah from Surah ${surahNumber}, Ayah 1`);
+                const originalText = ayahText;
+                
+                // Try different Bismillah patterns
+                if (ayahText.startsWith(bismillahWithSpace)) {
+                  ayahText = ayahText.substring(bismillahWithSpace.length).trim();
+                  console.log(`[Fallback] Removed Bismillah (with space) from Surah ${surahNumber}, Ayah 1`);
+                } else if (ayahText.startsWith(bismillah)) {
                   ayahText = ayahText.substring(bismillah.length).trim();
+                  console.log(`[Fallback] Removed Bismillah from Surah ${surahNumber}, Ayah 1`);
+                } else if (ayahText.startsWith(bismillahVariant)) {
+                  ayahText = ayahText.substring(bismillahVariant.length).trim();
+                  console.log(`[Fallback] Removed Bismillah (variant) from Surah ${surahNumber}, Ayah 1`);
+                }
+                
+                if (originalText !== ayahText) {
+                  console.log(`[Fallback] Surah ${surahNumber} - Bismillah removed successfully`);
                 }
               }
               
