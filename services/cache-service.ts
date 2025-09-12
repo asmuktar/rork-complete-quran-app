@@ -17,7 +17,7 @@ class CacheService {
   private memoryCache: Map<string, CacheEntry<any>> = new Map();
   private readonly DEFAULT_TTL = 30 * 60 * 1000; // 30 minutes
   private readonly DEFAULT_MAX_SIZE = 100;
-  private readonly CACHE_VERSION = '1.1.0'; // Updated for better compatibility
+  private readonly CACHE_VERSION = '1.2.0'; // Updated to fix Bismillah issue
   private readonly STORAGE_PREFIX = 'cache_';
   private readonly METADATA_KEY = 'cache_metadata';
   

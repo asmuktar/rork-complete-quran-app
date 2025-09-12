@@ -122,7 +122,10 @@ class QuranApiService {
             if (surahNumber !== 1 && surahNumber !== 9 && ayah.numberInSurah === 1) {
               // Remove Bismillah if it's at the beginning of the first ayah
               if (ayahText.startsWith(bismillah)) {
+                console.log(`Removing Bismillah from Surah ${surahNumber}, Ayah 1`);
+                console.log(`Before: "${ayahText.substring(0, 100)}..."`);
                 ayahText = ayahText.substring(bismillah.length).trim();
+                console.log(`After: "${ayahText.substring(0, 100)}..."`);
               }
             }
             
@@ -248,6 +251,7 @@ class QuranApiService {
               // For all surahs except Al-Fatihah (1) and At-Tawbah (9), remove Bismillah from first ayah
               if (surahNumber !== 1 && surahNumber !== 9 && ayah.numberInSurah === 1) {
                 if (ayahText.startsWith(bismillah)) {
+                  console.log(`[Fallback] Removing Bismillah from Surah ${surahNumber}, Ayah 1`);
                   ayahText = ayahText.substring(bismillah.length).trim();
                 }
               }
