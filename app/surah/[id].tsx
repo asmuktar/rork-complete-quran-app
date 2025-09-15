@@ -45,6 +45,19 @@ function SurahScreenContent() {
     audioPlayer.setReciter(selectedReciter);
   }, [selectedReciter, audioPlayer]);
   
+  // Clear cache on component mount to ensure updated Bismillah logic takes effect
+  useEffect(() => {
+    const clearCacheOnMount = async () => {
+      try {
+        console.log('Clearing Quran cache to apply updated Bismillah removal logic...');
+        await cacheService.clearQuranCache();
+      } catch (error) {
+        console.error('Error clearing cache on mount:', error);
+      }
+    };
+    clearCacheOnMount();
+  }, []);
+  
   useEffect(() => {
     const checkNetwork = () => {
       setIsOnline(offlineService.getNetworkStatus());
@@ -437,7 +450,26 @@ function SurahScreenContent() {
         style={styles.content} 
         showsVerticalScrollIndicator={false}
       >
-
+        {/* Bismillah - Show for all surahs except Al-Fatihah (1) and At-Tawbah (9) */}
+        {surahId !== 1 && surahId !== 9 && (
+          <View style={[styles.ayahCard, styles.basmallahCard]}>
+            <View style={styles.ayahHeader}>
+              <View style={[styles.ayahNumber, styles.basmallahNumber]}>
+                <Text style={styles.basmallahNumberText}>
+                  بسملة
+                </Text>
+              </View>
+            </View>
+            
+            <Text style={styles.basmallahText}>
+              بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ
+            </Text>
+            
+            <Text style={styles.ayahTranslation}>
+              In the name of Allah, the Most Gracious, the Most Merciful
+            </Text>
+          </View>
+        )}
         
         {surah.verses?.map((ayah: any) => {
           // Debug: Log the ayah data to understand the structure
