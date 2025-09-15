@@ -231,16 +231,64 @@ class QuranApiService {
           name: data.verses[0]?.chapter?.name_arabic || '',
           englishName: data.verses[0]?.chapter?.name_simple || `Surah ${surahNumber}`,
           numberOfAyahs: data.verses.length,
-          ayahs: data.verses.map((verse: any) => ({
-            number: verse.id,
-            text: verse.text_uthmani || verse.text_indopak || verse.text_imlaei || '',
-            numberInSurah: verse.verse_number,
-            translation: verse.translations?.[0]?.text || '',
-            juz: verse.juz_number || 1,
-            hizb: verse.hizb_number || 1,
-            page: verse.page_number || 1,
-            sajda: verse.sajda_number ? true : false
-          }))
+          ayahs: data.verses.map((verse: any) => {
+            let ayahText = verse.text_uthmani || verse.text_indopak || verse.text_imlaei || '';
+            
+            // For all surahs except Al-Fatihah (1) and At-Tawbah (9), remove Bismillah from first ayah
+            if (surahNumber !== 1 && surahNumber !== 9 && verse.verse_number === 1) {
+              const originalText = ayahText;
+              
+              // Comprehensive Bismillah removal patterns
+              const bismillahPatterns = [
+                'بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ ',
+                'بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ',
+                'بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ ',
+                'بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ',
+                'بسم الله الرحمن الرحيم ',
+                'بسم الله الرحمن الرحيم',
+                'بِسْمِ اللهِ الرَّحْمنِ الرَّحِيمِ ',
+                'بِسْمِ اللهِ الرَّحْمنِ الرَّحِيمِ',
+                'بسم اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ ',
+                'بسم اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ',
+                'بِسْمِ اللّٰهِ الرَّحْمٰنِ الرَّحِيْمِ ',
+                'بِسْمِ اللّٰهِ الرَّحْمٰنِ الرَّحِيْمِ'
+              ];
+              
+              let bismillahRemoved = false;
+              for (const pattern of bismillahPatterns) {
+                if (ayahText.startsWith(pattern)) {
+                  ayahText = ayahText.substring(pattern.length).trim();
+                  console.log(`✓ [Quran.com] Removed Bismillah pattern from Surah ${surahNumber}, Ayah 1: "${pattern}"`);
+                  bismillahRemoved = true;
+                  break;
+                }
+              }
+              
+              // If no exact pattern match, try regex-based removal as fallback
+              if (!bismillahRemoved && /^بِسْمِ\s*اللَّ?هِ\s*الرَّحْمَ?ٰ?نِ\s*الرَّحِيمِ\s*/.test(ayahText)) {
+                ayahText = ayahText.replace(/^بِسْمِ\s*اللَّ?هِ\s*الرَّحْمَ?ٰ?نِ\s*الرَّحِيمِ\s*/, '').trim();
+                console.log(`✓ [Quran.com] Removed Bismillah using regex from Surah ${surahNumber}, Ayah 1`);
+                bismillahRemoved = true;
+              }
+              
+              if (bismillahRemoved) {
+                console.log(`[Quran.com] Surah ${surahNumber} - Bismillah removed successfully`);
+              } else if (originalText.length > 50) {
+                console.warn(`⚠️ [Quran.com] Could not remove Bismillah from Surah ${surahNumber}, Ayah 1. Text: "${originalText.substring(0, 100)}..."`);
+              }
+            }
+            
+            return {
+              number: verse.id,
+              text: ayahText,
+              numberInSurah: verse.verse_number,
+              translation: verse.translations?.[0]?.text || '',
+              juz: verse.juz_number || 1,
+              hizb: verse.hizb_number || 1,
+              page: verse.page_number || 1,
+              sajda: verse.sajda_number ? true : false
+            };
+          })
         };
         
         // Validate that we have Arabic text

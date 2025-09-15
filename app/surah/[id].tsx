@@ -51,6 +51,8 @@ function SurahScreenContent() {
       try {
         console.log('Clearing Quran cache to apply updated Bismillah removal logic...');
         await cacheService.clearQuranCache();
+        // Force refetch after clearing cache
+        surahQuery.refetch();
       } catch (error) {
         console.error('Error clearing cache on mount:', error);
       }
