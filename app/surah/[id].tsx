@@ -127,7 +127,7 @@ function SurahScreenContent() {
         <TouchableOpacity 
           style={styles.debugButton}
           onPress={async () => {
-            console.log('Clearing Quran cache...');
+            console.log('Clearing Quran cache and refetching...');
             await cacheService.clearQuranCache();
             surahQuery.refetch();
           }}
