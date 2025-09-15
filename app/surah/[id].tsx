@@ -45,20 +45,8 @@ function SurahScreenContent() {
     audioPlayer.setReciter(selectedReciter);
   }, [selectedReciter, audioPlayer]);
   
-  // Clear cache on component mount to ensure updated Bismillah logic takes effect
-  useEffect(() => {
-    const clearCacheOnMount = async () => {
-      try {
-        console.log('Clearing Quran cache to apply updated Bismillah removal logic...');
-        await cacheService.clearQuranCache();
-        // Force refetch after clearing cache
-        surahQuery.refetch();
-      } catch (error) {
-        console.error('Error clearing cache on mount:', error);
-      }
-    };
-    clearCacheOnMount();
-  }, []);
+  // Cache is automatically cleared when cache version is updated
+  // No manual clearing needed - handled by cache service
   
   useEffect(() => {
     const checkNetwork = () => {
