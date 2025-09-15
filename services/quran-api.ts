@@ -105,9 +105,6 @@ class QuranApiService {
         }
         
         // Remove Bismillah from first ayah for all surahs except Al-Fatihah (1) and At-Tawbah (9)
-        const bismillah = 'بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ';
-        const bismillahWithSpace = 'بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ ';
-        const bismillahVariant = 'بسم الله الرحمن الرحيم';
         
         const normalizedData = {
           number: surahNumber,
@@ -125,16 +122,22 @@ class QuranApiService {
               // Remove Bismillah if it's at the beginning of the first ayah
               const originalText = ayahText;
               
-              // Try different Bismillah patterns
-              if (ayahText.startsWith(bismillahWithSpace)) {
-                ayahText = ayahText.substring(bismillahWithSpace.length).trim();
-                console.log(`Removed Bismillah (with space) from Surah ${surahNumber}, Ayah 1`);
-              } else if (ayahText.startsWith(bismillah)) {
-                ayahText = ayahText.substring(bismillah.length).trim();
-                console.log(`Removed Bismillah from Surah ${surahNumber}, Ayah 1`);
-              } else if (ayahText.startsWith(bismillahVariant)) {
-                ayahText = ayahText.substring(bismillahVariant.length).trim();
-                console.log(`Removed Bismillah (variant) from Surah ${surahNumber}, Ayah 1`);
+              // More comprehensive Bismillah removal patterns
+              const bismillahPatterns = [
+                'بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ ',
+                'بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ',
+                'بسم الله الرحمن الرحيم ',
+                'بسم الله الرحمن الرحيم',
+                'بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ ',
+                'بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ'
+              ];
+              
+              for (const pattern of bismillahPatterns) {
+                if (ayahText.startsWith(pattern)) {
+                  ayahText = ayahText.substring(pattern.length).trim();
+                  console.log(`Removed Bismillah pattern from Surah ${surahNumber}, Ayah 1: "${pattern}"`);
+                  break;
+                }
               }
               
               if (originalText !== ayahText) {
@@ -251,9 +254,6 @@ class QuranApiService {
         
         if (arabicData && arabicData.ayahs && arabicData.ayahs.length > 0) {
           // Remove Bismillah from first ayah for all surahs except Al-Fatihah (1) and At-Tawbah (9)
-          const bismillah = 'بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ';
-          const bismillahWithSpace = 'بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ ';
-          const bismillahVariant = 'بسم الله الرحمن الرحيم';
           
           const normalizedData = {
             number: surahNumber,
@@ -268,16 +268,22 @@ class QuranApiService {
               if (surahNumber !== 1 && surahNumber !== 9 && ayah.numberInSurah === 1) {
                 const originalText = ayahText;
                 
-                // Try different Bismillah patterns
-                if (ayahText.startsWith(bismillahWithSpace)) {
-                  ayahText = ayahText.substring(bismillahWithSpace.length).trim();
-                  console.log(`[Fallback] Removed Bismillah (with space) from Surah ${surahNumber}, Ayah 1`);
-                } else if (ayahText.startsWith(bismillah)) {
-                  ayahText = ayahText.substring(bismillah.length).trim();
-                  console.log(`[Fallback] Removed Bismillah from Surah ${surahNumber}, Ayah 1`);
-                } else if (ayahText.startsWith(bismillahVariant)) {
-                  ayahText = ayahText.substring(bismillahVariant.length).trim();
-                  console.log(`[Fallback] Removed Bismillah (variant) from Surah ${surahNumber}, Ayah 1`);
+                // More comprehensive Bismillah removal patterns
+                const bismillahPatterns = [
+                  'بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ ',
+                  'بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ',
+                  'بسم الله الرحمن الرحيم ',
+                  'بسم الله الرحمن الرحيم',
+                  'بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ ',
+                  'بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ'
+                ];
+                
+                for (const pattern of bismillahPatterns) {
+                  if (ayahText.startsWith(pattern)) {
+                    ayahText = ayahText.substring(pattern.length).trim();
+                    console.log(`[Fallback] Removed Bismillah pattern from Surah ${surahNumber}, Ayah 1: "${pattern}"`);
+                    break;
+                  }
                 }
                 
                 if (originalText !== ayahText) {

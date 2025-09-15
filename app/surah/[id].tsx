@@ -437,26 +437,7 @@ function SurahScreenContent() {
         style={styles.content} 
         showsVerticalScrollIndicator={false}
       >
-        {/* Add Basmallah for all surahs except Al-Fatihah (1) and At-Tawbah (9) */}
-        {surahId !== 1 && surahId !== 9 && (
-          <View style={[styles.ayahCard, styles.basmallahCard]}>
-            <View style={styles.ayahHeader}>
-              <View style={[styles.ayahNumber, styles.basmallahNumber]}>
-                <Text style={[styles.ayahNumberText, styles.basmallahNumberText]}>
-                  بسم الله
-                </Text>
-              </View>
-            </View>
-            
-            <Text style={[styles.ayahArabicText, styles.basmallahText]}>
-              بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ
-            </Text>
-            
-            <Text style={styles.ayahTranslation}>
-              In the name of Allah, the Entirely Merciful, the Especially Merciful.
-            </Text>
-          </View>
-        )}
+
         
         {surah.verses?.map((ayah: any) => {
           // Debug: Log the ayah data to understand the structure
