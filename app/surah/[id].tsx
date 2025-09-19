@@ -442,22 +442,22 @@ function SurahScreenContent() {
       >
         {/* Bismillah - Show for all surahs except Al-Fatihah (1) and At-Tawbah (9) */}
         {surahId !== 1 && surahId !== 9 && (
-          <View style={[styles.ayahCard, styles.basmallahCard]}>
-            <View style={styles.ayahHeader}>
-              <View style={[styles.ayahNumber, styles.basmallahNumber]}>
-                <Text style={styles.basmallahNumberText}>
-                  بسملة
-                </Text>
+          <View style={styles.bismillahContainer}>
+            <View style={styles.bismillahHeader}>
+              <View style={styles.surahNameBadge}>
+                <Text style={styles.surahNameText}>{surah.chapter?.name_simple || `Surah ${surahId}`}</Text>
               </View>
             </View>
             
-            <Text style={styles.basmallahText}>
-              بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ
-            </Text>
-            
-            <Text style={styles.ayahTranslation}>
-              In the name of Allah, the Most Gracious, the Most Merciful
-            </Text>
+            <View style={styles.bismillahContent}>
+              <Text style={styles.bismillahArabic}>
+                بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ
+              </Text>
+              
+              <Text style={styles.bismillahTranslation}>
+                In the name of Allah, the Most Gracious, the Most Merciful
+              </Text>
+            </View>
           </View>
         )}
         
@@ -476,15 +476,14 @@ function SurahScreenContent() {
             <View 
               key={`${surahId}-${ayah.verse_number}`} 
               style={[
-                styles.ayahCard,
-                audioPlayer.currentAyah === ayah.verse_number && styles.ayahCardActive
+                styles.ayahContainer,
+                audioPlayer.currentAyah === ayah.verse_number && styles.ayahContainerActive
               ]}
             >
-              <View style={styles.ayahHeader}>
-                <View style={styles.ayahNumber}>
-                  <Text style={styles.ayahNumberText}>
-                    {ayah.verse_number}
-                  </Text>
+              {/* Ayah Number and Actions */}
+              <View style={styles.ayahTopRow}>
+                <View style={styles.ayahNumberContainer}>
+                  <Text style={styles.ayahNumber}>{ayah.verse_number}</Text>
                 </View>
                 
                 <View style={styles.ayahActions}>
@@ -493,9 +492,9 @@ function SurahScreenContent() {
                     style={styles.actionButton}
                   >
                     {bookmarkedAyahs.has(ayah.verse_number) ? (
-                      <BookmarkCheck size={20} color={Colors.islamicGold} />
+                      <BookmarkCheck size={18} color={Colors.islamicGold} />
                     ) : (
-                      <Bookmark size={20} color={Colors.textLight} />
+                      <Bookmark size={18} color={Colors.textLight} />
                     )}
                   </TouchableOpacity>
                   
@@ -504,14 +503,27 @@ function SurahScreenContent() {
                     style={styles.actionButton}
                     disabled={audioPlayer.isLoading}
                   >
-                    <Volume2 size={20} color={Colors.primary} />
+                    <Volume2 size={18} color={Colors.primary} />
                   </TouchableOpacity>
                 </View>
               </View>
               
-              <Text style={styles.ayahArabicText}>
-                {ayah.text_uthmani || 'No Arabic text available'}
-              </Text>
+              {/* Arabic Text */}
+              <View style={styles.ayahTextContainer}>
+                <Text style={styles.ayahArabicText}>
+                  {ayah.text_uthmani || 'No Arabic text available'}
+                  <Text style={styles.ayahNumberInText}> ﴿{ayah.verse_number}﴾</Text>
+                </Text>
+              </View>
+              
+              {/* Translation */}
+              {ayah.translations?.[0]?.text && (
+                <View style={styles.translationContainer}>
+                  <Text style={styles.ayahTranslation}>
+                    {ayah.translations[0].text}
+                  </Text>
+                </View>
+              )}
               
               {/* Debug info */}
               {!ayah.text_uthmani && (
@@ -520,8 +532,7 @@ function SurahScreenContent() {
                 </Text>
               )}
               
-              <Text style={styles.ayahTranslation}>{ayah.translations?.[0]?.text || ''}</Text>
-              
+              {/* Meta info */}
               <View style={styles.ayahMeta}>
                 <Text style={styles.metaText}>Juz {ayah.juz_number || 1} • Hizb {ayah.hizb_number || 1}</Text>
               </View>
@@ -743,85 +754,121 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 20,
   },
-  ayahCard: {
+  bismillahContainer: {
     backgroundColor: Colors.surface,
+    marginVertical: 16,
     borderRadius: 16,
-    padding: 16,
-    marginVertical: 6,
+    overflow: 'hidden',
     elevation: 2,
     shadowColor: Colors.text,
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
-    borderLeftWidth: 4,
-    borderLeftColor: Colors.surfaceVariant,
   },
-  basmallahCard: {
-    backgroundColor: Colors.primaryOverlay,
-    borderLeftColor: Colors.islamicGold,
-    marginVertical: 12,
+  bismillahHeader: {
+    backgroundColor: Colors.primary,
+    paddingVertical: 8,
+    alignItems: 'center',
   },
-  basmallahNumber: {
-    backgroundColor: Colors.islamicGold,
-    borderColor: Colors.islamicGold,
-    minWidth: 80,
+  surahNameBadge: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingHorizontal: 16,
+    paddingVertical: 4,
+    borderRadius: 12,
   },
-  basmallahNumberText: {
+  surahNameText: {
     color: Colors.textOnPrimary,
-    fontSize: 12,
-    fontWeight: 'bold',
+    fontSize: 14,
+    fontWeight: '600',
   },
-  basmallahText: {
-    fontSize: 28,
+  bismillahContent: {
+    padding: 20,
+    alignItems: 'center',
+  },
+  bismillahArabic: {
+    fontSize: 24,
     textAlign: 'center',
     color: Colors.primary,
     fontWeight: '600',
+    marginBottom: 12,
+    lineHeight: 36,
+  },
+  bismillahTranslation: {
+    fontSize: 14,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+    fontStyle: 'italic',
+  },
+  ayahContainer: {
+    backgroundColor: Colors.surface,
     marginVertical: 8,
+    borderRadius: 12,
+    padding: 16,
+    elevation: 1,
+    shadowColor: Colors.text,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 1,
   },
-  ayahCardActive: {
-    borderLeftColor: Colors.islamicGold,
+  ayahContainerActive: {
     backgroundColor: Colors.primaryOverlay,
+    borderWidth: 1,
+    borderColor: Colors.islamicGold,
   },
-  ayahHeader: {
+  ayahTopRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 12,
   },
-  ayahNumber: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+  ayahNumberContainer: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     backgroundColor: Colors.primaryOverlay,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
     borderColor: Colors.primary,
   },
-  ayahNumberText: {
-    fontSize: 14,
+  ayahNumber: {
+    fontSize: 12,
     fontWeight: 'bold',
     color: Colors.primary,
+  },
+  ayahTextContainer: {
+    marginBottom: 12,
+  },
+  translationContainer: {
+    backgroundColor: Colors.surfaceVariant,
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 8,
   },
   ayahActions: {
     flexDirection: 'row',
     gap: 8,
   },
   actionButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     backgroundColor: Colors.surfaceVariant,
     justifyContent: 'center',
     alignItems: 'center',
+    marginLeft: 8,
   },
   ayahArabicText: {
-    fontSize: 22,
-    lineHeight: 36,
+    fontSize: 20,
+    lineHeight: 32,
     color: Colors.text,
     textAlign: 'right',
-    marginBottom: 12,
     fontWeight: '500',
+  },
+  ayahNumberInText: {
+    fontSize: 16,
+    color: Colors.primary,
+    fontWeight: 'bold',
   },
   ayahTransliteration: {
     fontSize: 16,
@@ -831,10 +878,10 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   ayahTranslation: {
-    fontSize: 16,
-    lineHeight: 24,
-    color: Colors.textSecondary,
-    marginBottom: 8,
+    fontSize: 15,
+    lineHeight: 22,
+    color: Colors.text,
+    textAlign: 'left',
   },
   ayahMeta: {
     borderTopWidth: 1,

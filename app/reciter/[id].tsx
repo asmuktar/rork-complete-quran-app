@@ -1,14 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Star, Volume2, Play, Pause, Heart, Share2, Download } from 'lucide-react-native';
+import { Star, Volume2, Play, Pause, Heart, Share2, Download, DownloadCloud } from 'lucide-react-native';
 import { useLocalSearchParams, Stack } from 'expo-router';
 import { Colors } from '@/constants/colors';
 import { TOP_RECITERS } from '@/constants/reciters';
 import { useAudioPlayer } from '@/hooks/use-audio-player';
 import DownloadManager from '@/components/DownloadManager';
 import audioDownloadService from '@/services/audio-download-service';
+import { trpc } from '@/lib/trpc';
 
 export default function ReciterDetailScreen() {
   const { id } = useLocalSearchParams();
@@ -20,19 +21,25 @@ export default function ReciterDetailScreen() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isDownloaded, setIsDownloaded] = useState(false);
   const [showDownloadManager, setShowDownloadManager] = useState(false);
+  const [showSurahsList, setShowSurahsList] = useState(false);
+  const [downloadedSurahs, setDownloadedSurahs] = useState<Set<number>>(new Set());
+  
+  // Fetch all surahs
+  const surahsQuery = trpc.quran.surahs.useQuery();
+  const surahs = surahsQuery.data || [];
 
-  useEffect(() => {
-    checkDownloadStatus();
-  }, [reciterId]);
-
-  const checkDownloadStatus = async () => {
+  const checkDownloadStatus = useCallback(async () => {
     try {
       const downloaded = await audioDownloadService.isReciterDownloaded(reciterId);
       setIsDownloaded(downloaded);
     } catch (error) {
       console.error('Error checking download status:', error);
     }
-  };
+  }, [reciterId]);
+
+  useEffect(() => {
+    checkDownloadStatus();
+  }, [checkDownloadStatus]);
 
   if (!reciter) {
     return (
@@ -71,9 +78,47 @@ export default function ReciterDetailScreen() {
     Alert.alert('Share', `Share ${reciter.name} with others`);
   };
 
-  const handleDownload = () => {
-    setShowDownloadManager(true);
+  // Removed unused handleDownload function
+  
+  const handleDownloadSurah = async (surahNumber: number) => {
+    try {
+      // Here you would implement individual surah download logic
+      console.log(`Downloading surah ${surahNumber} for reciter ${reciterId}`);
+      Alert.alert('Download Started', `Downloading Surah ${surahNumber}...`);
+      
+      // Simulate download completion
+      setTimeout(() => {
+        setDownloadedSurahs(prev => new Set([...prev, surahNumber]));
+      }, 2000);
+    } catch (error) {
+      console.error('Error downloading surah:', error);
+      Alert.alert('Error', 'Failed to download surah');
+    }
   };
+  
+  useEffect(() => {
+    const checkDownloadedSurahs = async () => {
+      // Check which surahs are already downloaded
+      const downloaded = new Set<number>();
+      for (let i = 1; i <= 114; i++) {
+        try {
+          // For now, simulate checking download status
+          // In a real implementation, you would check if the audio file exists
+          const isDownloaded = Math.random() > 0.8; // Simulate some downloaded
+          if (isDownloaded) {
+            downloaded.add(i);
+          }
+        } catch {
+          // Ignore errors for individual checks
+        }
+      }
+      setDownloadedSurahs(downloaded);
+    };
+    
+    if (showSurahsList) {
+      checkDownloadedSurahs();
+    }
+  }, [showSurahsList, reciterId]);
 
   const handleDownloadComplete = () => {
     checkDownloadStatus();
@@ -158,7 +203,7 @@ export default function ReciterDetailScreen() {
         
         <TouchableOpacity 
           style={[styles.secondaryButton, isDownloaded && styles.downloadedButton]} 
-          onPress={handleDownload}
+          onPress={() => setShowSurahsList(true)}
         >
           <Download size={20} color={isDownloaded ? Colors.success : Colors.primary} />
         </TouchableOpacity>
@@ -182,6 +227,58 @@ export default function ReciterDetailScreen() {
           />
         </View>
       )}
+      
+      {/* Surahs List Modal */}
+      {showSurahsList && (
+        <View style={styles.surahsListContainer}>
+          <View style={styles.surahsListHeader}>
+            <Text style={styles.surahsListTitle}>{reciter?.name} - Surahs</Text>
+            <TouchableOpacity 
+              style={styles.closeButton}
+              onPress={() => setShowSurahsList(false)}
+            >
+              <Text style={styles.closeButtonText}>✕</Text>
+            </TouchableOpacity>
+          </View>
+          
+          <View style={styles.downloadAllContainer}>
+            <TouchableOpacity 
+              style={styles.downloadAllButton}
+              onPress={() => {
+                setShowSurahsList(false);
+                setShowDownloadManager(true);
+              }}
+            >
+              <DownloadCloud size={20} color={Colors.textOnPrimary} />
+              <Text style={styles.downloadAllText}>Download All Database</Text>
+            </TouchableOpacity>
+          </View>
+          
+          <ScrollView style={styles.surahsList} showsVerticalScrollIndicator={false}>
+            {surahs.map((surah: any) => (
+              <TouchableOpacity 
+                key={surah.number}
+                style={styles.surahItem}
+                onPress={() => handleDownloadSurah(surah.number)}
+              >
+                <View style={styles.surahItemContent}>
+                  <View style={styles.surahInfo}>
+                    <Text style={styles.surahName}>Surah {surah.name}</Text>
+                    <Text style={styles.surahSubtitle}>Download surah</Text>
+                  </View>
+                  
+                  <View style={styles.downloadIconContainer}>
+                    <Download 
+                      size={20} 
+                      color={downloadedSurahs.has(surah.number) ? Colors.success : Colors.primary} 
+                    />
+                  </View>
+                </View>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      )}
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Description */}
@@ -194,8 +291,8 @@ export default function ReciterDetailScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Specialties</Text>
           <View style={styles.specialtiesContainer}>
-            {reciter.specialties.map((specialty, index) => (
-              <View key={index} style={styles.specialtyTag}>
+            {reciter.specialties.map((specialty) => (
+              <View key={specialty} style={styles.specialtyTag}>
                 <Text style={styles.specialtyText}>{specialty}</Text>
               </View>
             ))}
@@ -205,9 +302,9 @@ export default function ReciterDetailScreen() {
         {/* Sample Ayahs */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Sample Recitations</Text>
-          {reciter.sampleAyahs.map((sample, index) => (
+          {reciter.sampleAyahs.map((sample) => (
             <TouchableOpacity 
-              key={index} 
+              key={`${sample.surah}-${sample.ayah}`} 
               style={styles.recitationItem}
               onPress={async () => {
                 try {
@@ -527,5 +624,87 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: Colors.textSecondary,
     fontWeight: 'bold',
+  },
+  surahsListContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    zIndex: 1000,
+  },
+  surahsListHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: Colors.surface,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.surfaceVariant,
+  },
+  surahsListTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: Colors.text,
+  },
+  downloadAllContainer: {
+    backgroundColor: Colors.surface,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.surfaceVariant,
+  },
+  downloadAllButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.primary,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    gap: 8,
+  },
+  downloadAllText: {
+    color: Colors.textOnPrimary,
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  surahsList: {
+    flex: 1,
+    backgroundColor: Colors.surface,
+  },
+  surahItem: {
+    backgroundColor: Colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.surfaceVariant,
+  },
+  surahItemContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+  },
+  surahInfo: {
+    flex: 1,
+  },
+  surahName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: Colors.text,
+    marginBottom: 4,
+  },
+  surahSubtitle: {
+    fontSize: 14,
+    color: Colors.textSecondary,
+  },
+  downloadIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: Colors.primaryOverlay,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });

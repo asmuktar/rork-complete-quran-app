@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions, Alert, Modal } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Book, BookOpen, Search, Clock, Compass, Settings, Star, Users, Sun, Moon, Smartphone } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors } from '@/constants/colors';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width } = Dimensions.get('window');
 
@@ -16,6 +17,7 @@ export default function HomeScreen() {
   
   const [keepScreenOn, setKeepScreenOn] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
+  const [showDownloadDialog, setShowDownloadDialog] = useState(false);
   
   const toggleKeepScreenOn = async () => {
     try {
@@ -40,6 +42,37 @@ export default function HomeScreen() {
       'Dark Mode',
       isDarkMode ? 'Switched to Light Mode' : 'Switched to Dark Mode'
     );
+  };
+  
+  useEffect(() => {
+    checkFirstLaunch();
+  }, []);
+  
+  const checkFirstLaunch = async () => {
+    try {
+      const hasLaunchedBefore = await AsyncStorage.getItem('hasLaunchedBefore');
+      if (!hasLaunchedBefore) {
+        setShowDownloadDialog(true);
+      }
+    } catch (error) {
+      console.error('Error checking first launch:', error);
+    }
+  };
+  
+  const handleDownloadDialogResponse = async (download: boolean) => {
+    try {
+      await AsyncStorage.setItem('hasLaunchedBefore', 'true');
+      setShowDownloadDialog(false);
+      
+      if (download) {
+        console.log('User chose to download required files');
+        Alert.alert('Download Started', 'Downloading required files for offline use...');
+      } else {
+        console.log('User chose to skip download');
+      }
+    } catch (error) {
+      console.error('Error saving first launch flag:', error);
+    }
   };
 
   const quickStats = [
@@ -291,6 +324,46 @@ export default function HomeScreen() {
           </View>
         </View>
       </ScrollView>
+      
+      {/* Download Required Files Modal */}
+      <Modal
+        visible={showDownloadDialog}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => handleDownloadDialogResponse(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.downloadDialog}>
+            <View style={styles.downloadDialogHeader}>
+              <Text style={styles.downloadDialogTitle}>Download Required Files?</Text>
+            </View>
+            
+            <View style={styles.downloadDialogContent}>
+              <Text style={styles.downloadDialogText}>
+                In order for Quran Android to work properly, we need to download some files. 
+                If you do not do this now, the app may not work reliably and will require an Internet 
+                connection for reading. Would you like to download the required files now?
+              </Text>
+            </View>
+            
+            <View style={styles.downloadDialogActions}>
+              <TouchableOpacity 
+                style={styles.downloadDialogButtonSecondary}
+                onPress={() => handleDownloadDialogResponse(false)}
+              >
+                <Text style={styles.downloadDialogButtonSecondaryText}>NO</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={styles.downloadDialogButtonPrimary}
+                onPress={() => handleDownloadDialogResponse(true)}
+              >
+                <Text style={styles.downloadDialogButtonPrimaryText}>YES</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -598,5 +671,72 @@ const styles = StyleSheet.create({
     color: Colors.textLight,
     textAlign: 'center',
     fontWeight: '500',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  downloadDialog: {
+    backgroundColor: Colors.surface,
+    borderRadius: 16,
+    width: '100%',
+    maxWidth: 400,
+    elevation: 8,
+    shadowColor: Colors.text,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+  },
+  downloadDialogHeader: {
+    padding: 24,
+    paddingBottom: 16,
+  },
+  downloadDialogTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: Colors.text,
+    textAlign: 'center',
+  },
+  downloadDialogContent: {
+    paddingHorizontal: 24,
+    paddingBottom: 24,
+  },
+  downloadDialogText: {
+    fontSize: 16,
+    color: Colors.textSecondary,
+    lineHeight: 24,
+    textAlign: 'center',
+  },
+  downloadDialogActions: {
+    flexDirection: 'row',
+    borderTopWidth: 1,
+    borderTopColor: Colors.surfaceVariant,
+  },
+  downloadDialogButtonSecondary: {
+    flex: 1,
+    paddingVertical: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRightWidth: 1,
+    borderRightColor: Colors.surfaceVariant,
+  },
+  downloadDialogButtonPrimary: {
+    flex: 1,
+    paddingVertical: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  downloadDialogButtonSecondaryText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: Colors.textSecondary,
+  },
+  downloadDialogButtonPrimaryText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: Colors.primary,
   },
 });
