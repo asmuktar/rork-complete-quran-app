@@ -474,9 +474,13 @@ function SurahScreenContent() {
           
           // Remove Bismillah from the first ayah if it starts with it
           let cleanArabicText = ayah.text_uthmani || '';
-          if (ayah.verse_number === 1 && cleanArabicText.includes('بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ')) {
-            // Remove the Bismillah from the beginning of the first ayah
-            cleanArabicText = cleanArabicText.replace(/^\s*بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ\s*/, '').trim();
+          if (ayah.verse_number === 1) {
+            // Remove any form of Bismillah from the beginning of the first ayah
+            cleanArabicText = cleanArabicText
+              .replace(/^\s*بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ\s*/, '') // Standard Bismillah
+              .replace(/^\s*بسم الله الرحمن الرحيم\s*/, '') // Without diacritics
+              .replace(/^\s*بِسْمِ\s+اللَّهِ\s+الرَّحْمَٰنِ\s+الرَّحِيمِ\s*/, '') // With spaces
+              .trim();
           }
           
           return (
@@ -523,14 +527,7 @@ function SurahScreenContent() {
                 </Text>
               </View>
               
-              {/* Translation */}
-              {ayah.translations?.[0]?.text && (
-                <View style={styles.translationContainer}>
-                  <Text style={styles.ayahTranslation}>
-                    {ayah.translations[0].text}
-                  </Text>
-                </View>
-              )}
+              {/* Translation - Removed completely */}
               
               {/* Debug info */}
               {!ayah.text_uthmani && (

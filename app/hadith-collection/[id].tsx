@@ -72,6 +72,9 @@ export default function HadithCollectionScreen() {
       tirmidhi: 'Jami at-Tirmidhi',
       nasai: 'Sunan an-Nasai',
       ibnmajah: 'Sunan Ibn Majah',
+      malik: 'Muwatta Malik',
+      ahmad: 'Musnad Ahmad',
+      arbauna: 'An-Nawawi\'s Forty Hadith',
     };
     return collections[collectionId] || 'Hadith Collection';
   };

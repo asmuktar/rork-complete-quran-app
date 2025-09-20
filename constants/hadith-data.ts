@@ -28,7 +28,7 @@ export const HADITH_COLLECTIONS: HadithCollection[] = [
     name: 'Sahih al-Bukhari',
     arabicName: 'صحيح البخاري',
     compiler: 'Imam al-Bukhari',
-    totalHadiths: 33, // Updated to reflect actual available hadiths
+    totalHadiths: 7563,
     description: 'The most authentic collection of Hadith after the Quran',
     authenticity: 'Sahih',
     available: true
@@ -38,7 +38,7 @@ export const HADITH_COLLECTIONS: HadithCollection[] = [
     name: 'Sahih Muslim',
     arabicName: 'صحيح مسلم',
     compiler: 'Imam Muslim',
-    totalHadiths: 10, // Updated to reflect actual available hadiths
+    totalHadiths: 7190,
     description: 'Second most authentic collection after Bukhari',
     authenticity: 'Sahih',
     available: true
@@ -48,7 +48,7 @@ export const HADITH_COLLECTIONS: HadithCollection[] = [
     name: 'Sunan Abu Dawud',
     arabicName: 'سنن أبي داود',
     compiler: 'Abu Dawud',
-    totalHadiths: 2, // Updated to reflect actual available hadiths
+    totalHadiths: 5274,
     description: 'Focus on legal and practical matters of Islam',
     authenticity: 'Mixed',
     available: true
@@ -58,7 +58,7 @@ export const HADITH_COLLECTIONS: HadithCollection[] = [
     name: 'Jami at-Tirmidhi',
     arabicName: 'جامع الترمذي',
     compiler: 'At-Tirmidhi',
-    totalHadiths: 2, // Updated to reflect actual available hadiths
+    totalHadiths: 3956,
     description: 'Known for grading authenticity of hadiths',
     authenticity: 'Mixed',
     available: true
@@ -68,7 +68,7 @@ export const HADITH_COLLECTIONS: HadithCollection[] = [
     name: 'Sunan an-Nasa\'i',
     arabicName: 'سنن النسائي',
     compiler: 'An-Nasa\'i',
-    totalHadiths: 2, // Updated to reflect actual available hadiths
+    totalHadiths: 5761,
     description: 'Strict criteria for hadith acceptance',
     authenticity: 'Mixed',
     available: true
@@ -78,7 +78,7 @@ export const HADITH_COLLECTIONS: HadithCollection[] = [
     name: 'Sunan Ibn Majah',
     arabicName: 'سنن ابن ماجه',
     compiler: 'Ibn Majah',
-    totalHadiths: 2, // Updated to reflect actual available hadiths
+    totalHadiths: 4341,
     description: 'Completes the six major collections (Kutub as-Sittah)',
     authenticity: 'Mixed',
     available: true
@@ -88,7 +88,7 @@ export const HADITH_COLLECTIONS: HadithCollection[] = [
     name: 'Muwatta Malik',
     arabicName: 'موطأ مالك',
     compiler: 'Imam Malik',
-    totalHadiths: 2, // Updated to reflect actual available hadiths
+    totalHadiths: 1594,
     description: 'Earliest surviving collection of hadith',
     authenticity: 'Sahih',
     available: true
@@ -98,9 +98,19 @@ export const HADITH_COLLECTIONS: HadithCollection[] = [
     name: 'Musnad Ahmad',
     arabicName: 'مسند أحمد',
     compiler: 'Ahmad ibn Hanbal',
-    totalHadiths: 2, // Updated to reflect actual available hadiths
+    totalHadiths: 26363,
     description: 'Largest collection of hadiths by narrator',
     authenticity: 'Mixed',
+    available: true
+  },
+  {
+    id: 'arbauna',
+    name: 'An-Nawawi\'s Forty Hadith',
+    arabicName: 'الأربعون النووية',
+    compiler: 'Imam An-Nawawi',
+    totalHadiths: 42,
+    description: 'Forty essential hadiths covering fundamental Islamic principles',
+    authenticity: 'Sahih',
     available: true
   }
 ];
@@ -518,6 +528,128 @@ export const HADITH_DATABASE: Hadith[] = [
     chapter: 'Minding one\'s own business',
     collection: 'bukhari',
     keywords: ['excellence', 'islam', 'leave', 'concern', 'business', 'mind']
+  },
+  
+  // An-Nawawi's Forty Hadith (Arbauna)
+  {
+    id: 34,
+    number: 1,
+    arab: 'إِنَّمَا الْأَعْمَالُ بِالنِّيَّاتِ، وَإِنَّمَا لِكُلِّ امْرِئٍ مَا نَوَى، فَمَنْ كَانَتْ هِجْرَتُهُ إِلَى اللَّهِ وَرَسُولِهِ فَهِجْرَتُهُ إِلَى اللَّهِ وَرَسُولِهِ، وَمَنْ كَانَتْ هِجْرَتُهُ لِدُنْيَا يُصِيبُهَا أَوِ امْرَأَةٍ يَنْكِحُهَا فَهِجْرَتُهُ إِلَى مَا هَاجَرَ إِلَيْهِ',
+    translation: 'Actions are but by intention and every man shall have only that which he intended. Therefore, he whose migration (Hijrah) was for Allah and His Messenger, his migration was for Allah and His Messenger, and he whose migration was to achieve some worldly benefit or to take some woman in marriage, his migration was for that for which he migrated.',
+    narrator: 'Umar ibn al-Khattab (RA)',
+    grade: 'Sahih',
+    book: 'An-Nawawi\'s Forty Hadith',
+    chapter: 'The Foundation of Actions',
+    collection: 'arbauna',
+    keywords: ['intention', 'niyyah', 'actions', 'migration', 'hijrah', 'purpose', 'deed']
+  },
+  {
+    id: 35,
+    number: 2,
+    arab: 'بَيْنَمَا نَحْنُ عِنْدَ رَسُولِ اللَّهِ صَلَّى اللَّهُ عَلَيْهِ وَسَلَّمَ ذَاتَ يَوْمٍ إِذْ طَلَعَ عَلَيْنَا رَجُلٌ شَدِيدُ بَيَاضِ الثِّيَابِ شَدِيدُ سَوَادِ الشَّعَرِ لَا يُرَى عَلَيْهِ أَثَرُ السَّفَرِ وَلَا يَعْرِفُهُ مِنَّا أَحَدٌ',
+    translation: 'One day while we were sitting with the Messenger of Allah (peace be upon him), there appeared before us a man whose clothes were exceedingly white and whose hair was exceedingly black; no signs of journeying were to be seen on him and none of us knew him.',
+    narrator: 'Umar ibn al-Khattab (RA)',
+    grade: 'Sahih',
+    book: 'An-Nawawi\'s Forty Hadith',
+    chapter: 'Islam, Iman, and Ihsan',
+    collection: 'arbauna',
+    keywords: ['islam', 'iman', 'ihsan', 'gabriel', 'jibril', 'faith', 'worship']
+  },
+  {
+    id: 36,
+    number: 3,
+    arab: 'بُنِيَ الْإِسْلَامُ عَلَى خَمْسٍ: شَهَادَةِ أَنْ لَا إِلَهَ إِلَّا اللَّهُ وَأَنَّ مُحَمَّدًا رَسُولُ اللَّهِ، وَإِقَامِ الصَّلَاةِ، وَإِيتَاءِ الزَّكَاةِ، وَالْحَجِّ، وَصَوْمِ رَمَضَانَ',
+    translation: 'Islam has been built on five [pillars]: testifying that there is no deity worthy of worship except Allah and that Muhammad is the Messenger of Allah, establishing the salah (prayer), paying the zakat (obligatory charity), making the hajj (pilgrimage) to the House, and fasting in Ramadan.',
+    narrator: 'Abdullah ibn Umar (RA)',
+    grade: 'Sahih',
+    book: 'An-Nawawi\'s Forty Hadith',
+    chapter: 'The Five Pillars of Islam',
+    collection: 'arbauna',
+    keywords: ['islam', 'pillars', 'shahada', 'prayer', 'zakat', 'hajj', 'fasting', 'ramadan']
+  },
+  {
+    id: 37,
+    number: 4,
+    arab: 'إِنَّ أَحَدَكُمْ يُجْمَعُ خَلْقُهُ فِي بَطْنِ أُمِّهِ أَرْبَعِينَ يَوْمًا، ثُمَّ يَكُونُ عَلَقَةً مِثْلَ ذَلِكَ، ثُمَّ يَكُونُ مُضْغَةً مِثْلَ ذَلِكَ، ثُمَّ يَبْعَثُ اللَّهُ مَلَكًا فَيُؤْمَرُ بِأَرْبَعِ كَلِمَاتٍ',
+    translation: 'Verily the creation of each one of you is brought together in his mother\'s belly for forty days in the form of seed, then he is a clot of blood for a like period, then a morsel of flesh for a like period, then there is sent to him the angel who blows the breath of life into him.',
+    narrator: 'Abdullah ibn Masud (RA)',
+    grade: 'Sahih',
+    book: 'An-Nawawi\'s Forty Hadith',
+    chapter: 'The Stages of Creation',
+    collection: 'arbauna',
+    keywords: ['creation', 'destiny', 'qadar', 'angel', 'soul', 'life', 'predestination']
+  },
+  {
+    id: 38,
+    number: 5,
+    arab: 'مَنْ أَحْدَثَ فِي أَمْرِنَا هَذَا مَا لَيْسَ فِيهِ فَهُوَ رَدٌّ',
+    translation: 'Whosoever does an act which our matter [religion] is not upon, that act is rejected.',
+    narrator: 'Aisha (RA)',
+    grade: 'Sahih',
+    book: 'An-Nawawi\'s Forty Hadith',
+    chapter: 'Rejection of Innovation',
+    collection: 'arbauna',
+    keywords: ['innovation', 'bidah', 'rejected', 'religion', 'sunnah', 'authentic']
+  },
+  {
+    id: 39,
+    number: 6,
+    arab: 'إِنَّ الْحَلَالَ بَيِّنٌ وَإِنَّ الْحَرَامَ بَيِّنٌ وَبَيْنَهُمَا مُشْتَبِهَاتٌ لَا يَعْلَمُهُنَّ كَثِيرٌ مِنَ النَّاسِ',
+    translation: 'That which is lawful is plain and that which is unlawful is plain and between the two of them are doubtful matters about which not many people know.',
+    narrator: 'An-Nu\'man ibn Bashir (RA)',
+    grade: 'Sahih',
+    book: 'An-Nawawi\'s Forty Hadith',
+    chapter: 'The Lawful and Unlawful',
+    collection: 'arbauna',
+    keywords: ['halal', 'haram', 'lawful', 'unlawful', 'doubtful', 'clear', 'guidance']
+  },
+  {
+    id: 40,
+    number: 7,
+    arab: 'الدِّينُ النَّصِيحَةُ قُلْنَا لِمَنْ قَالَ لِلَّهِ وَلِكِتَابِهِ وَلِرَسُولِهِ وَلِأَئِمَّةِ الْمُسْلِمِينَ وَعَامَّتِهِمْ',
+    translation: 'Religion is naseehah (advice, sincerity). We said: To whom? He said: To Allah, His Book, His Messenger, and to the leaders of the Muslims and their common folk.',
+    narrator: 'Tamim Ad-Dari (RA)',
+    grade: 'Sahih',
+    book: 'An-Nawawi\'s Forty Hadith',
+    chapter: 'Religion is Sincere Advice',
+    collection: 'arbauna',
+    keywords: ['religion', 'advice', 'sincerity', 'naseehah', 'allah', 'quran', 'prophet', 'leaders']
+  },
+  {
+    id: 41,
+    number: 8,
+    arab: 'أُمِرْتُ أَنْ أُقَاتِلَ النَّاسَ حَتَّى يَشْهَدُوا أَنْ لَا إِلَهَ إِلَّا اللَّهُ وَأَنَّ مُحَمَّدًا رَسُولُ اللَّهِ',
+    translation: 'I have been ordered to fight against people until they testify that there is no deity worthy of worship except Allah and that Muhammad is the Messenger of Allah.',
+    narrator: 'Abdullah ibn Umar (RA)',
+    grade: 'Sahih',
+    book: 'An-Nawawi\'s Forty Hadith',
+    chapter: 'The Testimony of Faith',
+    collection: 'arbauna',
+    keywords: ['fight', 'shahada', 'testimony', 'allah', 'muhammad', 'messenger', 'faith']
+  },
+  {
+    id: 42,
+    number: 9,
+    arab: 'مَا نَهَيْتُكُمْ عَنْهُ فَاجْتَنِبُوهُ وَمَا أَمَرْتُكُمْ بِهِ فَافْعَلُوا مِنْهُ مَا اسْتَطَعْتُمْ',
+    translation: 'What I have forbidden to you, avoid; and what I have commanded you [to do], do of it what you are able.',
+    narrator: 'Abu Hurairah (RA)',
+    grade: 'Sahih',
+    book: 'An-Nawawi\'s Forty Hadith',
+    chapter: 'Following Commands and Avoiding Prohibitions',
+    collection: 'arbauna',
+    keywords: ['forbidden', 'avoid', 'command', 'ability', 'obedience', 'capacity']
+  },
+  {
+    id: 43,
+    number: 10,
+    arab: 'إِنَّ اللَّهَ طَيِّبٌ لَا يَقْبَلُ إِلَّا طَيِّبًا وَإِنَّ اللَّهَ أَمَرَ الْمُؤْمِنِينَ بِمَا أَمَرَ بِهِ الْمُرْسَلِينَ',
+    translation: 'Verily Allah is good and pure and He accepts only that which is good and pure. And verily Allah has commanded the believers to do that which he commanded the Messengers.',
+    narrator: 'Abu Hurairah (RA)',
+    grade: 'Sahih',
+    book: 'An-Nawawi\'s Forty Hadith',
+    chapter: 'Allah Accepts Only Pure Things',
+    collection: 'arbauna',
+    keywords: ['allah', 'pure', 'good', 'tayyib', 'accepts', 'believers', 'messengers']
   }
 ];
 
