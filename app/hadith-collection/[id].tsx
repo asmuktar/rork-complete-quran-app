@@ -99,7 +99,10 @@ export default function HadithCollectionScreen() {
   const renderHadith = (hadith: Hadith, index: number) => (
     <View key={`${hadith.id}-${index}`} style={styles.hadithCard}>
       <View style={styles.hadithHeader}>
-        <Text style={styles.hadithNumber}>#{hadith.number}</Text>
+        <View style={styles.hadithNumberContainer}>
+          <Text style={styles.hadithSequence}>{index + 1}</Text>
+          <Text style={styles.hadithOriginalNumber}>#{hadith.number}</Text>
+        </View>
         <View style={[styles.gradeBadge, { backgroundColor: getGradeColor(hadith.grade) }]}>
           <Star size={12} color="#ffffff" />
           <Text style={styles.gradeText}>{hadith.grade}</Text>
@@ -250,6 +253,20 @@ const styles = StyleSheet.create({
   },
   hadithNumber: {
     fontSize: 14,
+    color: '#9ca3af',
+    fontWeight: '500',
+  },
+  hadithNumberContainer: {
+    alignItems: 'flex-start',
+    gap: 2,
+  },
+  hadithSequence: {
+    fontSize: 16,
+    color: '#d4af37',
+    fontWeight: 'bold',
+  },
+  hadithOriginalNumber: {
+    fontSize: 12,
     color: '#9ca3af',
     fontWeight: '500',
   },

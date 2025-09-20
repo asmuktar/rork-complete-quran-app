@@ -472,6 +472,13 @@ function SurahScreenContent() {
             });
           }
           
+          // Remove Bismillah from the first ayah if it starts with it
+          let cleanArabicText = ayah.text_uthmani || '';
+          if (ayah.verse_number === 1 && cleanArabicText.includes('بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ')) {
+            // Remove the Bismillah from the beginning of the first ayah
+            cleanArabicText = cleanArabicText.replace(/^\s*بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ\s*/, '').trim();
+          }
+          
           return (
             <View 
               key={`${surahId}-${ayah.verse_number}`} 
@@ -511,7 +518,7 @@ function SurahScreenContent() {
               {/* Arabic Text */}
               <View style={styles.ayahTextContainer}>
                 <Text style={styles.ayahArabicText}>
-                  {ayah.text_uthmani || 'No Arabic text available'}
+                  {cleanArabicText || 'No Arabic text available'}
                   <Text style={styles.ayahNumberInText}> ﴿{ayah.verse_number}﴾</Text>
                 </Text>
               </View>
