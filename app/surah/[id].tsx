@@ -472,15 +472,26 @@ function SurahScreenContent() {
             });
           }
           
-          // Remove Bismillah from the first ayah if it starts with it
+          // The new API should provide clean Arabic text without bismillah duplication
           let cleanArabicText = ayah.text_uthmani || '';
-          if (ayah.verse_number === 1) {
+          
+          // Additional safety check - remove bismillah if it still appears in first ayah
+          if (surahId !== 1 && surahId !== 9 && ayah.verse_number === 1) {
             // Remove any form of Bismillah from the beginning of the first ayah
-            cleanArabicText = cleanArabicText
-              .replace(/^\s*بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ\s*/, '') // Standard Bismillah
-              .replace(/^\s*بسم الله الرحمن الرحيم\s*/, '') // Without diacritics
-              .replace(/^\s*بِسْمِ\s+اللَّهِ\s+الرَّحْمَٰنِ\s+الرَّحِيمِ\s*/, '') // With spaces
-              .trim();
+            const bismillahPatterns = [
+              /^\s*بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ\s*/,
+              /^\s*بسم الله الرحمن الرحيم\s*/,
+              /^\s*بِسْمِ\s+اللَّهِ\s+الرَّحْمَٰنِ\s+الرَّحِيمِ\s*/,
+              /^\s*بِسۡمِ ٱللَّهِ ٱلرَّحۡمَٰنِ ٱلرَّحِيمِ\s*/
+            ];
+            
+            for (const pattern of bismillahPatterns) {
+              if (pattern.test(cleanArabicText)) {
+                cleanArabicText = cleanArabicText.replace(pattern, '').trim();
+                console.log(`✅ Removed bismillah from Surah ${surahId}, Ayah ${ayah.verse_number}`);
+                break;
+              }
+            }
           }
           
           return (
@@ -527,7 +538,7 @@ function SurahScreenContent() {
                 </Text>
               </View>
               
-              {/* Translation - Removed completely */}
+              {/* Translation removed as requested */}
               
               {/* Debug info */}
               {!ayah.text_uthmani && (
