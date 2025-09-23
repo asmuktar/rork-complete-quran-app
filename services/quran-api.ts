@@ -48,15 +48,13 @@ async function enhancedFetch(
 }
 
 class QuranApiService {
-  // New primary API - fawazahmed0/quran-api (clean Arabic text without bismillah duplication)
-  private fawazQuranUrl = 'https://cdn.jsdelivr.net/gh/fawazahmed0/quran-api@1';
-  private quranApiUrl = 'https://quranapi.pages.dev/api';
-  // Fallback APIs
+  // Primary API - AlQuran.cloud (reliable and clean)
   private alQuranUrl = 'https://api.alquran.cloud/v1';
+  // Fallback API
   private quranComUrl = 'https://api.quran.com/api/v4';
   
   async getSurah(surahNumber: number, edition: string = 'quran-uthmani'): Promise<any> {
-    const cacheKey = `${surahNumber}_${edition}_v2`;
+    const cacheKey = `${surahNumber}_${edition}_v3`;
     
     // Check cache first
     const cached = await cacheService.get('quran_ayahs', cacheKey);
@@ -65,109 +63,12 @@ class QuranApiService {
       return cached;
     }
     
-    // Primary API: fawazahmed0/quran-api (clean Arabic text without bismillah duplication)
+    // Primary API: AlQuran.cloud with editions (most reliable)
     try {
-      console.log(`Fetching surah ${surahNumber} from fawazahmed0/quran-api`);
-      
-      // Get Arabic text
-      const arabicResponse = await enhancedFetch(
-        `${this.fawazQuranUrl}/editions/ara-quranacademy/${surahNumber}.json`,
-        { retries: 3 }
-      );
-      
-      if (!arabicResponse.ok) {
-        throw new Error(`HTTP ${arabicResponse.status}: ${arabicResponse.statusText}`);
-      }
-      
-      const arabicData = await arabicResponse.json();
-      console.log(`fawazahmed0 Arabic API response for surah ${surahNumber}:`, {
-        hasChapter: !!arabicData.chapter,
-        hasVerses: !!arabicData.verse,
-        versesCount: arabicData.verse ? Object.keys(arabicData.verse).length : 0,
-        firstVerseText: arabicData.verse?.["1"]?.substring(0, 50),
-        sampleVerses: arabicData.verse ? Object.entries(arabicData.verse).slice(0, 3).map(([num, text]) => ({
-          number: num,
-          text: (text as string)?.substring(0, 30),
-          hasArabic: text && /[\u0600-\u06FF]/.test(text as string)
-        })) : []
-      });
-      
-      if (arabicData.chapter && arabicData.verse) {
-        // Get English translation
-        let englishTranslations: Record<string, string> = {};
-        try {
-          const translationResponse = await enhancedFetch(
-            `${this.fawazQuranUrl}/editions/eng-sahih/${surahNumber}.json`,
-            { retries: 2 }
-          );
-          if (translationResponse.ok) {
-            const translationData = await translationResponse.json();
-            englishTranslations = translationData.verse || {};
-          }
-        } catch (error) {
-          console.warn(`Failed to fetch translations for surah ${surahNumber}:`, error);
-        }
-        
-        // Convert to normalized format
-        const verses = Object.entries(arabicData.verse).map(([verseNumber, arabicText]) => {
-          const verseNum = parseInt(verseNumber);
-          let cleanArabicText = arabicText as string;
-          
-          // The fawazahmed0 API should provide clean text without bismillah duplication
-          // But let's add a safety check for the first verse of non-Fatihah, non-Tawbah surahs
-          if (surahNumber !== 1 && surahNumber !== 9 && verseNum === 1) {
-            // Only remove if it clearly starts with bismillah
-            const bismillahPattern = /^\s*بِسْمِ\s+اللَّهِ\s+الرَّحْمَٰنِ\s+الرَّحِيمِ\s+/;
-            if (bismillahPattern.test(cleanArabicText)) {
-              cleanArabicText = cleanArabicText.replace(bismillahPattern, '').trim();
-              console.log(`✅ Removed bismillah from Surah ${surahNumber}, Verse ${verseNum}`);
-            }
-          }
-          
-          return {
-            number: verseNum,
-            text: cleanArabicText,
-            numberInSurah: verseNum,
-            translation: englishTranslations[verseNumber] || '',
-            juz: 1, // Will be updated if we have this data
-            hizb: 1,
-            page: 1,
-            sajda: false
-          };
-        });
-        
-        const normalizedData = {
-          number: surahNumber,
-          name: arabicData.chapter || '',
-          englishName: `Surah ${surahNumber}`,
-          numberOfAyahs: verses.length,
-          ayahs: verses
-        };
-        
-        // Validate that we have Arabic text
-        const hasArabicText = normalizedData.ayahs.some((ayah: any) => 
-          ayah.text && ayah.text.trim().length > 0 && /[\u0600-\u06FF]/.test(ayah.text)
-        );
-        
-        if (!hasArabicText) {
-          console.warn(`No valid Arabic text found in fawazahmed0 response for surah ${surahNumber}`);
-          throw new Error('No Arabic text in response');
-        }
-        
-        await cacheService.set('quran_ayahs', cacheKey, normalizedData);
-        console.log(`Successfully fetched surah ${surahNumber} with ${normalizedData.ayahs.length} ayahs from fawazahmed0`);
-        return normalizedData;
-      }
-    } catch (error) {
-      console.error(`fawazahmed0 API failed for surah ${surahNumber}:`, error);
-    }
-    
-    // Fallback API: quranapi.pages.dev
-    try {
-      console.log(`Falling back to quranapi.pages.dev for surah ${surahNumber}`);
+      console.log(`Fetching surah ${surahNumber} from AlQuran.cloud editions`);
       const response = await enhancedFetch(
-        `${this.quranApiUrl}/surah/${surahNumber}`,
-        { retries: 2 }
+        `${this.alQuranUrl}/surah/${surahNumber}/editions/quran-uthmani,en.sahih`,
+        { retries: 3 }
       );
       
       if (!response.ok) {
@@ -175,57 +76,116 @@ class QuranApiService {
       }
       
       const data = await response.json();
-      console.log(`quranapi.pages.dev API response for surah ${surahNumber}:`, {
-        hasData: !!data,
-        hasAyahs: !!data.ayahs,
-        ayahsCount: data.ayahs?.length || 0,
-        firstAyahText: data.ayahs?.[0]?.text?.substring(0, 50)
-      });
       
-      if (data && data.ayahs && data.ayahs.length > 0) {
-        const normalizedData = {
-          number: surahNumber,
-          name: data.name || '',
-          englishName: data.englishName || `Surah ${surahNumber}`,
-          numberOfAyahs: data.ayahs.length,
-          ayahs: data.ayahs.map((ayah: any) => {
-            let ayahText = ayah.text || '';
-            
-            // Clean bismillah from first ayah if needed
-            if (surahNumber !== 1 && surahNumber !== 9 && ayah.numberInSurah === 1) {
-              const bismillahPattern = /^\s*بِسْمِ\s+اللَّهِ\s+الرَّحْمَٰنِ\s+الرَّحِيمِ\s+/;
-              if (bismillahPattern.test(ayahText)) {
-                ayahText = ayahText.replace(bismillahPattern, '').trim();
-                console.log(`✅ [quranapi.pages.dev] Removed bismillah from Surah ${surahNumber}, Ayah 1`);
+      if (data.data && Array.isArray(data.data) && data.data.length >= 1) {
+        const arabicData = data.data.find((d: any) => d.edition?.identifier === 'quran-uthmani') || data.data[0];
+        const englishData = data.data.find((d: any) => d.edition?.identifier === 'en.sahih');
+        
+        if (arabicData && arabicData.ayahs && arabicData.ayahs.length > 0) {
+          const normalizedData = {
+            number: surahNumber,
+            name: arabicData.name || '',
+            englishName: arabicData.englishName || `Surah ${surahNumber}`,
+            numberOfAyahs: arabicData.numberOfAyahs || arabicData.ayahs.length,
+            ayahs: arabicData.ayahs.map((ayah: any, index: number) => {
+              const englishAyah = englishData?.ayahs?.[index];
+              let ayahText = ayah.text || '';
+              
+              // For all surahs except Al-Fatihah (1) and At-Tawbah (9), remove Bismillah from first ayah
+              if (surahNumber !== 1 && surahNumber !== 9 && ayah.numberInSurah === 1) {
+                const originalText = ayahText;
+                
+                // Comprehensive Bismillah removal patterns - covering all possible variations
+                const bismillahPatterns = [
+                  // Standard Uthmani script variations
+                  'بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ ',
+                  'بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ',
+                  // Alternative script variations
+                  'بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ ',
+                  'بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ',
+                  // Simplified script variations
+                  'بسم الله الرحمن الرحيم ',
+                  'بسم الله الرحمن الرحيم',
+                  // With different diacritics
+                  'بِسْمِ اللهِ الرَّحْمنِ الرَّحِيمِ ',
+                  'بِسْمِ اللهِ الرَّحْمنِ الرَّحِيمِ',
+                  // Without some diacritics
+                  'بسم اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ ',
+                  'بسم اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ',
+                  // Alternative alif variations
+                  'بِسْمِ اللّٰهِ الرَّحْمٰنِ الرَّحِيْمِ ',
+                  'بِسْمِ اللّٰهِ الرَّحْمٰنِ الرَّحِيْمِ',
+                  // With different Unicode variations
+                  'بِسۡمِ ٱللَّهِ ٱلرَّحۡمَٰنِ ٱلرَّحِيمِ ',
+                  'بِسۡمِ ٱللَّهِ ٱلرَّحۡمَٰنِ ٱلرَّحِيمِ'
+                ];
+                
+                let bismillahRemoved = false;
+                for (const pattern of bismillahPatterns) {
+                  if (ayahText.startsWith(pattern)) {
+                    ayahText = ayahText.substring(pattern.length).trim();
+                    console.log(`✅ [AlQuran.cloud] Removed Bismillah pattern from Surah ${surahNumber}, Ayah 1: "${pattern.substring(0, 20)}..."`);
+                    bismillahRemoved = true;
+                    break;
+                  }
+                }
+                
+                // If no exact pattern match, try regex-based removal as fallback
+                if (!bismillahRemoved) {
+                  const regexPatterns = [
+                    /^بِسۡ?ْمِ\s*[اٱ]للَّ?ّٰ?هِ\s*[اٱ]لرَّحۡ?ْمَ?ٰ?نِ\s*[اٱ]لرَّحِيۡ?مِ\s*/,
+                    /^بسم\s*الله\s*الرحمن\s*الرحيم\s*/,
+                    /^بِسْمِ\s*اللَّهِ\s*الرَّحْمَٰنِ\s*الرَّحِيمِ\s*/,
+                    /^بِسْمِ\s*ٱللَّهِ\s*ٱلرَّحْمَٰنِ\s*ٱلرَّحِيمِ\s*/
+                  ];
+                  
+                  for (const regex of regexPatterns) {
+                    if (regex.test(ayahText)) {
+                      const match = ayahText.match(regex);
+                      if (match) {
+                        ayahText = ayahText.substring(match[0].length).trim();
+                        console.log(`✅ [AlQuran.cloud] Removed Bismillah using regex from Surah ${surahNumber}, Ayah 1`);
+                        bismillahRemoved = true;
+                        break;
+                      }
+                    }
+                  }
+                }
+                
+                if (bismillahRemoved && ayahText.length > 0 && ayahText !== originalText) {
+                  console.log(`✅ [AlQuran.cloud] Successfully cleaned Surah ${surahNumber}, Ayah 1`);
+                } else if (originalText.length > 50) {
+                  console.warn(`⚠️ [AlQuran.cloud] Could not remove Bismillah from Surah ${surahNumber}, Ayah 1. Text: "${originalText.substring(0, 100)}..."`);
+                }
               }
-            }
-            
-            return {
-              number: ayah.number,
-              text: ayahText,
-              numberInSurah: ayah.numberInSurah,
-              translation: ayah.translation || '',
-              juz: ayah.juz || 1,
-              hizb: ayah.hizb || 1,
-              page: ayah.page || 1,
-              sajda: ayah.sajda || false
-            };
-          })
-        };
-        
-        // Validate that we have Arabic text
-        const hasArabicText = normalizedData.ayahs.some((ayah: any) => 
-          ayah.text && ayah.text.trim().length > 0 && /[\u0600-\u06FF]/.test(ayah.text)
-        );
-        
-        if (hasArabicText) {
-          await cacheService.set('quran_ayahs', cacheKey, normalizedData);
-          console.log(`Successfully fetched surah ${surahNumber} with ${normalizedData.ayahs.length} ayahs from quranapi.pages.dev`);
-          return normalizedData;
+              
+              return {
+                number: ayah.number,
+                text: ayahText,
+                numberInSurah: ayah.numberInSurah,
+                translation: englishAyah?.text || '',
+                juz: ayah.juz || 1,
+                hizb: ayah.hizb || 1,
+                page: ayah.page || 1,
+                sajda: ayah.sajda || false
+              };
+            })
+          };
+          
+          // Validate that we have Arabic text
+          const hasArabicText = normalizedData.ayahs.some((ayah: any) => 
+            ayah.text && ayah.text.trim().length > 0 && /[\u0600-\u06FF]/.test(ayah.text)
+          );
+          
+          if (hasArabicText) {
+            await cacheService.set('quran_ayahs', cacheKey, normalizedData);
+            console.log(`✅ Successfully fetched surah ${surahNumber} with ${normalizedData.ayahs.length} ayahs from AlQuran.cloud`);
+            return normalizedData;
+          }
         }
       }
     } catch (error) {
-      console.error(`quranapi.pages.dev API failed for surah ${surahNumber}:`, error);
+      console.error(`❌ AlQuran.cloud API failed for surah ${surahNumber}:`, error);
     }
     
     // Fallback API: Quran.com

@@ -17,7 +17,7 @@ class CacheService {
   private memoryCache: Map<string, CacheEntry<any>> = new Map();
   private readonly DEFAULT_TTL = 30 * 60 * 1000; // 30 minutes
   private readonly DEFAULT_MAX_SIZE = 100;
-  private readonly CACHE_VERSION = '1.5.0'; // Updated to completely fix Bismillah duplication issue - enhanced patterns
+  private readonly CACHE_VERSION = '1.6.0'; // Fixed 404 errors by switching to reliable AlQuran.cloud API as primary source
   private readonly STORAGE_PREFIX = 'cache_';
   private readonly METADATA_KEY = 'cache_metadata';
   
