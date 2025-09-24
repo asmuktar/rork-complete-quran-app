@@ -18,6 +18,7 @@ interface Hadith {
   number: number;
   arab: string;
   translation: string;
+  transliteration?: string;
   narrator: string;
   grade: string;
   book: string;
@@ -29,9 +30,10 @@ export default function HadithCollectionScreen() {
   const [page, setPage] = useState<number>(1);
   const [allHadiths, setAllHadiths] = useState<Hadith[]>([]);
   const [hasMore, setHasMore] = useState<boolean>(true);
+  const [showTransliteration, setShowTransliteration] = useState<boolean>(false);
 
   const hadithsQuery = trpc.hadith.getHadiths.useQuery(
-    { collection: id || 'bukhari', page, limit: 50 },
+    { collection: id || 'bukhari', page, limit: 20 },
     {
       enabled: !!id,
     }
@@ -113,6 +115,9 @@ export default function HadithCollectionScreen() {
       </View>
       
       <Text style={styles.arabicText}>{hadith.arab}</Text>
+      {showTransliteration && hadith.transliteration && (
+        <Text style={styles.transliterationText}>{hadith.transliteration}</Text>
+      )}
       <Text style={styles.translationText}>{hadith.translation}</Text>
       
       <View style={styles.hadithFooter}>
@@ -168,6 +173,15 @@ export default function HadithCollectionScreen() {
           <Text style={styles.subtitle}>
             {allHadiths.length} hadiths loaded
           </Text>
+          
+          <TouchableOpacity
+            style={styles.transliterationToggle}
+            onPress={() => setShowTransliteration(!showTransliteration)}
+          >
+            <Text style={styles.transliterationToggleText}>
+              {showTransliteration ? 'Hide' : 'Show'} Transliteration
+            </Text>
+          </TouchableOpacity>
         </View>
 
         <View style={styles.hadithsList}>
@@ -351,6 +365,26 @@ const styles = StyleSheet.create({
   endMessageText: {
     color: '#9ca3af',
     fontSize: 14,
+    textAlign: 'center',
+  },
+  transliterationText: {
+    fontSize: 14,
+    color: '#a78bfa',
+    lineHeight: 20,
+    marginBottom: 8,
+    fontStyle: 'italic',
+  },
+  transliterationToggle: {
+    backgroundColor: '#374151',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+    marginTop: 12,
+  },
+  transliterationToggleText: {
+    color: '#d4af37',
+    fontSize: 14,
+    fontWeight: '600',
     textAlign: 'center',
   },
 });

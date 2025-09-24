@@ -30,7 +30,18 @@ export const getHadithsProcedure = publicProcedure
       const result = getHadithsByCollection(input.collection, input.page, input.limit);
       
       return {
-        hadiths: result.hadiths,
+        hadiths: result.hadiths.map(hadith => ({
+          id: hadith.id,
+          number: hadith.number,
+          arab: hadith.arab,
+          translation: hadith.translation,
+          transliteration: hadith.transliteration,
+          narrator: hadith.narrator,
+          collection: hadith.collection,
+          grade: hadith.grade,
+          book: hadith.book,
+          chapter: hadith.chapter
+        })),
         total: result.total,
         page: input.page,
         hasMore: result.hasMore
@@ -57,6 +68,7 @@ export const searchHadithsProcedure = publicProcedure
         number: hadith.number,
         arab: hadith.arab,
         translation: hadith.translation,
+        transliteration: hadith.transliteration,
         narrator: hadith.narrator,
         collection: hadith.collection,
         grade: hadith.grade,
