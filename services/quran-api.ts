@@ -50,7 +50,9 @@ async function enhancedFetch(
 class QuranApiService {
   // Primary API - AlQuran.cloud (reliable and clean)
   private alQuranUrl = 'https://api.alquran.cloud/v1';
-  // Fallback API
+  // Fallback API - QuranAPI.pages.dev
+  private quranApiUrl = 'https://cdn.jsdelivr.net/gh/fawazahmed0/quran-api@1';
+  // Legacy fallback API
   private quranComUrl = 'https://api.quran.com/api/v4';
   
   async getSurah(surahNumber: number, edition: string = 'quran-uthmani'): Promise<any> {
@@ -188,11 +190,11 @@ class QuranApiService {
       console.error(`❌ AlQuran.cloud API failed for surah ${surahNumber}:`, error);
     }
     
-    // Fallback API: Quran.com
+    // Fallback API: QuranAPI.pages.dev
     try {
-      console.log(`Falling back to Quran.com for surah ${surahNumber}`);
+      console.log(`Falling back to QuranAPI.pages.dev for surah ${surahNumber}`);
       const response = await enhancedFetch(
-        `${this.quranComUrl}/verses/by_chapter/${surahNumber}?language=en&words=true&translations=131&per_page=300`,
+        `${this.quranApiUrl}/editions/ara-quranacademy/${surahNumber}.json`,
         { retries: 2 }
       );
       
@@ -201,24 +203,24 @@ class QuranApiService {
       }
       
       const data = await response.json();
-      console.log(`Quran.com API response for surah ${surahNumber}:`, {
-        hasVerses: !!data.verses,
-        versesCount: data.verses?.length || 0,
-        firstVerseText: data.verses?.[0]?.text_uthmani?.substring(0, 50)
+      console.log(`QuranAPI.pages.dev API response for surah ${surahNumber}:`, {
+        hasChapter: !!data.chapter,
+        versesCount: data.chapter?.length || 0,
+        firstVerseText: data.chapter?.[0]?.substring(0, 50)
       });
       
-      if (data.verses && data.verses.length > 0) {
+      if (data.chapter && Array.isArray(data.chapter) && data.chapter.length > 0) {
         const normalizedData = {
           number: surahNumber,
-          name: data.verses[0]?.chapter?.name_arabic || '',
-          englishName: data.verses[0]?.chapter?.name_simple || `Surah ${surahNumber}`,
-          numberOfAyahs: data.verses.length,
-          ayahs: data.verses.map((verse: any) => {
-            let ayahText = verse.text_uthmani || verse.text_indopak || verse.text_imlaei || '';
+          name: `Surah ${surahNumber}`,
+          englishName: `Surah ${surahNumber}`,
+          numberOfAyahs: data.chapter.length,
+          ayahs: data.chapter.map((ayahText: string, index: number) => {
+            let processedText = ayahText || '';
             
             // For all surahs except Al-Fatihah (1) and At-Tawbah (9), remove Bismillah from first ayah
-            if (surahNumber !== 1 && surahNumber !== 9 && verse.verse_number === 1) {
-              const originalText = ayahText;
+            if (surahNumber !== 1 && surahNumber !== 9 && index === 0) {
+              const originalText = processedText;
               
               // Use the same enhanced patterns as the primary API
               const bismillahPatterns = [
@@ -241,12 +243,10 @@ class QuranApiService {
               ];
               
               let bismillahRemoved = false;
-              let removedPattern = '';
               
               for (const pattern of bismillahPatterns) {
-                if (ayahText.startsWith(pattern)) {
-                  ayahText = ayahText.substring(pattern.length).trim();
-                  removedPattern = pattern;
+                if (processedText.startsWith(pattern)) {
+                  processedText = processedText.substring(pattern.length).trim();
                   bismillahRemoved = true;
                   break;
                 }
@@ -262,11 +262,10 @@ class QuranApiService {
                 ];
                 
                 for (const regex of regexPatterns) {
-                  if (regex.test(ayahText)) {
-                    const match = ayahText.match(regex);
+                  if (regex.test(processedText)) {
+                    const match = processedText.match(regex);
                     if (match) {
-                      ayahText = ayahText.substring(match[0].length).trim();
-                      removedPattern = match[0];
+                      processedText = processedText.substring(match[0].length).trim();
                       bismillahRemoved = true;
                       break;
                     }
@@ -274,22 +273,22 @@ class QuranApiService {
                 }
               }
               
-              if (bismillahRemoved && ayahText.length > 0 && ayahText !== originalText) {
-                console.log(`✅ [Quran.com] Successfully removed Bismillah from Surah ${surahNumber}, Ayah 1`);
+              if (bismillahRemoved && processedText.length > 0 && processedText !== originalText) {
+                console.log(`✅ [QuranAPI.pages.dev] Successfully removed Bismillah from Surah ${surahNumber}, Ayah 1`);
               } else if (originalText.length > 50) {
-                console.warn(`⚠️ [Quran.com] Could not remove Bismillah from Surah ${surahNumber}, Ayah 1. Text: "${originalText.substring(0, 100)}..."`);
+                console.warn(`⚠️ [QuranAPI.pages.dev] Could not remove Bismillah from Surah ${surahNumber}, Ayah 1. Text: "${originalText.substring(0, 100)}..."`);
               }
             }
             
             return {
-              number: verse.id,
-              text: ayahText,
-              numberInSurah: verse.verse_number,
-              translation: verse.translations?.[0]?.text || '',
-              juz: verse.juz_number || 1,
-              hizb: verse.hizb_number || 1,
-              page: verse.page_number || 1,
-              sajda: verse.sajda_number ? true : false
+              number: index + 1,
+              text: processedText,
+              numberInSurah: index + 1,
+              translation: '',
+              juz: 1,
+              hizb: 1,
+              page: 1,
+              sajda: false
             };
           })
         };
@@ -301,12 +300,12 @@ class QuranApiService {
         
         if (hasArabicText) {
           await cacheService.set('quran_ayahs', cacheKey, normalizedData);
-          console.log(`Successfully fetched surah ${surahNumber} with ${normalizedData.ayahs.length} ayahs from Quran.com`);
+          console.log(`✅ Successfully fetched surah ${surahNumber} with ${normalizedData.ayahs.length} ayahs from QuranAPI.pages.dev`);
           return normalizedData;
         }
       }
     } catch (error) {
-      console.error(`Quran.com API failed for surah ${surahNumber}:`, error);
+      console.error(`❌ QuranAPI.pages.dev API failed for surah ${surahNumber}:`, error);
     }
     
     // Last resort: Try AlQuran.cloud with editions
@@ -431,20 +430,49 @@ class QuranApiService {
       return cached;
     }
     
+    // Try AlQuran.cloud first
     try {
-      console.log(`Fetching ayah ${surahNumber}:${ayahNumber} from API`);
-      const response = await enhancedFetch(`${this.quranComUrl}/verses/by_key/${surahNumber}:${ayahNumber}?language=en&words=true`, { retries: 2 });
+      console.log(`Fetching ayah ${surahNumber}:${ayahNumber} from AlQuran.cloud`);
+      const response = await enhancedFetch(`${this.alQuranUrl}/ayah/${surahNumber}:${ayahNumber}/editions/quran-uthmani`, { retries: 2 });
+      const data = await response.json();
+      
+      if (data.data && data.data.length > 0) {
+        const ayah = data.data[0];
+        const normalizedData = {
+          number: ayah.number,
+          text: ayah.text || '',
+          numberInSurah: ayah.numberInSurah,
+          translation: '',
+          juz: ayah.juz || 1,
+          hizb: ayah.hizb || 1,
+          page: ayah.page || 1,
+          sajda: ayah.sajda || false
+        };
+        
+        // Cache the result
+        await cacheService.set('quran_ayahs', cacheKey, normalizedData);
+        
+        return normalizedData;
+      }
+    } catch (error) {
+      console.error('AlQuran.cloud ayah fetch failed:', error);
+    }
+    
+    // Fallback to QuranAPI.pages.dev
+    try {
+      console.log(`Falling back to QuranAPI.pages.dev for ayah ${surahNumber}:${ayahNumber}`);
+      const response = await enhancedFetch(`${this.quranApiUrl}/editions/ara-quranacademy/${surahNumber}/${ayahNumber}.json`, { retries: 2 });
       const data = await response.json();
       
       const normalizedData = {
-        number: data.verse?.id,
-        text: data.verse?.text_uthmani || data.verse?.text_indopak || '',
-        numberInSurah: data.verse?.verse_number,
-        translation: data.verse?.translations?.[0]?.text || '',
-        juz: data.verse?.juz_number || 1,
-        hizb: data.verse?.hizb_number || 1,
-        page: data.verse?.page_number || 1,
-        sajda: data.verse?.sajda_number ? true : false
+        number: ayahNumber,
+        text: data.verse || '',
+        numberInSurah: ayahNumber,
+        translation: '',
+        juz: 1,
+        hizb: 1,
+        page: 1,
+        sajda: false
       };
       
       // Cache the result
@@ -452,7 +480,7 @@ class QuranApiService {
       
       return normalizedData;
     } catch (error) {
-      console.error('Error fetching ayah:', error);
+      console.error('Error fetching ayah from all sources:', error);
       throw error;
     }
   }
@@ -476,27 +504,10 @@ class QuranApiService {
       return cached;
     }
     
-    try {
-      console.log(`Searching Quran for: ${sanitizedQuery}`);
-      const response = await enhancedFetch(`${this.quranComUrl}/search?q=${encodeURIComponent(sanitizedQuery)}&size=20&translations=131`, { retries: 2 });
-      const data = await response.json();
-      
-      const normalizedData = data.search?.results?.map((result: any) => ({
-        surah: result.verse_key?.split(':')[0],
-        ayah: result.verse_key?.split(':')[1],
-        text: result.text,
-        translation: result.translations?.[0]?.text || '',
-        verse_key: result.verse_key
-      })) || [];
-      
-      // Cache the result
-      await cacheService.set('quran_search', cacheKey, normalizedData);
-      
-      return normalizedData;
-    } catch (error) {
-      console.error('Error searching Quran:', error);
-      throw error;
-    }
+    // For now, return empty array as QuranAPI.pages.dev doesn't have search functionality
+    // This would need to be implemented by fetching all surahs and searching locally
+    console.log(`Search not implemented for QuranAPI.pages.dev yet: ${sanitizedQuery}`);
+    return [];
   }
 
   async getTranslation(surahNumber: number, ayahNumber: number, translationId: number = 131): Promise<any> {
@@ -510,14 +521,20 @@ class QuranApiService {
     }
     
     try {
-      console.log(`Fetching translation ${surahNumber}:${ayahNumber}`);
-      const response = await fetch(`${this.quranComUrl}/verses/by_key/${surahNumber}:${ayahNumber}?translations=${translationId}`);
+      console.log(`Fetching translation ${surahNumber}:${ayahNumber} from QuranAPI.pages.dev`);
+      const response = await enhancedFetch(`${this.quranApiUrl}/editions/eng-sahih/${surahNumber}/${ayahNumber}.json`, { retries: 2 });
       const data = await response.json();
       
-      // Cache the result
-      await cacheService.set('translations', cacheKey, data.verse);
+      const translationData = {
+        text: data.verse || '',
+        verse_number: ayahNumber,
+        chapter_id: surahNumber
+      };
       
-      return data.verse;
+      // Cache the result
+      await cacheService.set('translations', cacheKey, translationData);
+      
+      return translationData;
     } catch (error) {
       console.error('Error fetching translation:', error);
       throw error;
@@ -594,72 +611,46 @@ class QuranApiService {
       console.error('Error fetching from AlQuran.cloud:', error);
     }
     
-    // Fallback to Quran.com
+    // Fallback to QuranAPI.pages.dev
     try {
-      console.log('Falling back to Quran.com for surahs');
-      const response = await enhancedFetch(`${this.quranComUrl}/chapters?language=en`, { retries: 2 });
+      console.log('Falling back to QuranAPI.pages.dev for surahs');
+      const response = await enhancedFetch(`${this.quranApiUrl}/info.json`, { retries: 2 });
       const data = await response.json();
       
       if (data.chapters && Array.isArray(data.chapters) && data.chapters.length > 0) {
-        const normalizedData = data.chapters.map((chapter: any) => ({
-          number: chapter.id,
-          name: chapter.name_simple,
-          arabicName: chapter.name_arabic,
-          englishName: chapter.translated_name?.name || chapter.name_simple,
-          numberOfAyahs: chapter.verses_count,
-          revelationType: chapter.revelation_place
+        const normalizedData = data.chapters.map((chapter: any, index: number) => ({
+          number: index + 1,
+          name: chapter.name || `Surah ${index + 1}`,
+          arabicName: chapter.arabic || '',
+          englishName: chapter.english || chapter.name || `Surah ${index + 1}`,
+          numberOfAyahs: chapter.verses || 0,
+          revelationType: chapter.type || 'meccan'
         }));
         
         // Cache the result
         await cacheService.set('quran_surahs', cacheKey, normalizedData);
-        console.log(`Successfully fetched ${normalizedData.length} surahs from Quran.com`);
+        console.log(`Successfully fetched ${normalizedData.length} surahs from QuranAPI.pages.dev`);
         return normalizedData;
       }
     } catch (error) {
-      console.error('Error fetching from Quran.com:', error);
+      console.error('Error fetching from QuranAPI.pages.dev:', error);
     }
     
     throw new Error('Failed to fetch surahs from all sources');
   }
 
+  // Juz fetching is not implemented for QuranAPI.pages.dev
   async getJuz(juzNumber: number, edition: string = 'quran-uthmani'): Promise<any> {
     const cacheKey = `${juzNumber}_${edition}`;
-    
     // Check cache first
     const cached = await cacheService.get('quran_ayahs', cacheKey);
     if (cached) {
       console.log(`Cache hit for juz ${juzNumber}`);
       return cached;
     }
-    
-    try {
-      console.log(`Fetching juz ${juzNumber} from API`);
-      const response = await enhancedFetch(`${this.quranComUrl}/verses/by_juz/${juzNumber}?language=en&words=true&translations=131&per_page=1000`, { retries: 2 });
-      const data = await response.json();
-      
-      const normalizedData = {
-        juz: juzNumber,
-        verses: data.verses?.map((verse: any) => ({
-          number: verse.id,
-          text: verse.text_uthmani || verse.text_indopak || '',
-          numberInSurah: verse.verse_number,
-          surahNumber: verse.chapter_id,
-          translation: verse.translations?.[0]?.text || '',
-          juz: verse.juz_number || juzNumber,
-          hizb: verse.hizb_number || 1,
-          page: verse.page_number || 1,
-          sajda: verse.sajda_number ? true : false
-        })) || []
-      };
-      
-      // Cache the result
-      await cacheService.set('quran_ayahs', cacheKey, normalizedData);
-      
-      return normalizedData;
-    } catch (error) {
-      console.error('Error fetching juz:', error);
-      throw error;
-    }
+    // Not implemented
+    console.log('Juz fetching not implemented for QuranAPI.pages.dev');
+    return null;
   }
 }
 
