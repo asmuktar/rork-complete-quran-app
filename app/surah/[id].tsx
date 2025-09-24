@@ -477,20 +477,63 @@ function SurahScreenContent() {
           
           // Additional safety check - remove bismillah if it still appears in first ayah
           if (surahId !== 1 && surahId !== 9 && ayah.verse_number === 1) {
-            // Remove any form of Bismillah from the beginning of the first ayah
+            const originalText = cleanArabicText;
+            
+            // Comprehensive Bismillah removal patterns - exact string matching first
             const bismillahPatterns = [
-              /^\s*بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ\s*/,
-              /^\s*بسم الله الرحمن الرحيم\s*/,
-              /^\s*بِسْمِ\s+اللَّهِ\s+الرَّحْمَٰنِ\s+الرَّحِيمِ\s*/,
-              /^\s*بِسۡمِ ٱللَّهِ ٱلرَّحۡمَٰنِ ٱلرَّحِيمِ\s*/
+              'بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ ',
+              'بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ',
+              'بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ ',
+              'بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ',
+              'بِسۡمِ ٱللَّهِ ٱلرَّحۡمَٰنِ ٱلرَّحِيمِ ',
+              'بِسۡمِ ٱللَّهِ ٱلرَّحۡمَٰنِ ٱلرَّحِيمِ',
+              'بسم الله الرحمن الرحيم ',
+              'بسم الله الرحمن الرحيم'
             ];
             
+            let bismillahRemoved = false;
+            
+            // Try exact string matching first
             for (const pattern of bismillahPatterns) {
-              if (pattern.test(cleanArabicText)) {
-                cleanArabicText = cleanArabicText.replace(pattern, '').trim();
-                console.log(`✅ Removed bismillah from Surah ${surahId}, Ayah ${ayah.verse_number}`);
+              if (cleanArabicText.startsWith(pattern)) {
+                cleanArabicText = cleanArabicText.substring(pattern.length).trim();
+                console.log(`✅ [UI] Removed Bismillah exact pattern from Surah ${surahId}, Ayah ${ayah.verse_number}`);
+                bismillahRemoved = true;
                 break;
               }
+            }
+            
+            // If exact matching fails, try regex patterns
+            if (!bismillahRemoved) {
+              const regexPatterns = [
+                /^\s*بِسۡ?ْمِ\s+[اٱ]للَّ?ّٰ?هِ\s+[اٱ]لرَّحۡ?ْمَ?ٰ?نِ\s+[اٱ]لرَّحِيۡ?مِ\s*/,
+                /^\s*بسم\s+الله\s+الرحمن\s+الرحيم\s*/,
+                /^\s*بِسْمِ\s+اللَّهِ\s+الرَّحْمَٰنِ\s+الرَّحِيمِ\s*/,
+                /^\s*بِسْمِ\s+ٱللَّهِ\s+ٱلرَّحْمَٰنِ\s+ٱلرَّحِيمِ\s*/
+              ];
+              
+              for (const pattern of regexPatterns) {
+                const match = cleanArabicText.match(pattern);
+                if (match && match[0].length > 15) {
+                  cleanArabicText = cleanArabicText.replace(pattern, '').trim();
+                  console.log(`✅ [UI] Removed Bismillah using regex from Surah ${surahId}, Ayah ${ayah.verse_number}`);
+                  bismillahRemoved = true;
+                  break;
+                }
+              }
+            }
+            
+            // Final check - if text is still suspiciously long, force remove
+            if (!bismillahRemoved && originalText.length > 100) {
+              const words = originalText.split(' ');
+              if (words.length > 10) {
+                cleanArabicText = words.slice(6).join(' ').trim();
+                console.log(`🔧 [UI] Force-removed suspected Bismillah from Surah ${surahId}, Ayah ${ayah.verse_number}`);
+              }
+            }
+            
+            if (cleanArabicText !== originalText) {
+              console.log(`✅ [UI] Successfully cleaned Surah ${surahId}, Ayah ${ayah.verse_number}. Original length: ${originalText.length}, New length: ${cleanArabicText.length}`);
             }
           }
           

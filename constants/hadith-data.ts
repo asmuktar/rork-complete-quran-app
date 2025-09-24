@@ -694,6 +694,13 @@ export const getHadithsByCollection = (collectionId: string, page: number = 1, l
   
   console.log(`Found ${realHadiths.length} authentic hadiths for collection ${collectionId}`);
   
+  // Debug: Log available collections and their counts
+  const collectionCounts = HADITH_DATABASE.reduce((acc, hadith) => {
+    acc[hadith.collection] = (acc[hadith.collection] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+  console.log('Available collections and counts:', collectionCounts);
+  
   const startIndex = (page - 1) * limit;
   const endIndex = startIndex + limit;
   
