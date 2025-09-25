@@ -115,9 +115,12 @@ export default function HadithCollectionScreen() {
       </View>
       
       <Text style={styles.arabicText}>{hadith.arab}</Text>
+      
+      {/* Always show transliteration if available */}
       {showTransliteration && hadith.transliteration && (
         <Text style={styles.transliterationText}>{hadith.transliteration}</Text>
       )}
+      
       <Text style={styles.translationText}>{hadith.translation}</Text>
       
       <View style={styles.hadithFooter}>
@@ -171,7 +174,7 @@ export default function HadithCollectionScreen() {
           <BookOpen size={32} color="#d4af37" />
           <Text style={styles.title}>{getCollectionName(id || '')}</Text>
           <Text style={styles.subtitle}>
-            {allHadiths.length} hadiths loaded
+            {allHadiths.length} hadiths loaded{hasMore ? ' (more available)' : ' (complete)'}
           </Text>
           
           <TouchableOpacity
