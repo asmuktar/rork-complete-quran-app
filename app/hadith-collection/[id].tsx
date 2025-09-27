@@ -116,7 +116,7 @@ export default function HadithCollectionScreen() {
       
       <Text style={styles.arabicText}>{hadith.arab}</Text>
       
-      {/* Always show transliteration if available */}
+      {/* Show transliteration if enabled and available */}
       {showTransliteration && hadith.transliteration && (
         <Text style={styles.transliterationText}>{hadith.transliteration}</Text>
       )}

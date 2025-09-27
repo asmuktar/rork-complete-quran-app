@@ -56,7 +56,7 @@ class QuranApiService {
   private quranComUrl = 'https://api.quran.com/api/v4';
   
   async getSurah(surahNumber: number, edition: string = 'quran-uthmani'): Promise<any> {
-    const cacheKey = `${surahNumber}_${edition}_v5_nuclear_bismillah_fix`;
+    const cacheKey = `${surahNumber}_${edition}_v6_ultimate_bismillah_fix`;
     
     // Check cache first
     const cached = await cacheService.get('quran_ayahs', cacheKey);
@@ -98,19 +98,31 @@ class QuranApiService {
                 const originalText = ayahText;
                 console.log(`🔍 [AlQuran.cloud] Processing Surah ${surahNumber}, Ayah 1. Original text: "${originalText.substring(0, 100)}..."`);
                 
-                // NUCLEAR APPROACH: Always remove the first part that looks like Bismillah
-                // This is the most aggressive approach to ensure Bismillah is never duplicated
+                // ULTRA-AGGRESSIVE BISMILLAH REMOVAL
+                // This approach uses multiple methods to ensure complete removal
                 
-                // Step 1: Try exact string matching for known Bismillah patterns
+                // Method 1: Comprehensive exact string patterns (all known variations)
                 const bismillahPatterns = [
+                  // Standard Uthmani variations
                   'بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ ',
                   'بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ',
+                  // With alif wasla
                   'بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ ',
                   'بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ',
+                  // With different diacritics
                   'بِسۡمِ ٱللَّهِ ٱلرَّحۡمَٰنِ ٱلرَّحِيمِ ',
                   'بِسۡمِ ٱللَّهِ ٱلرَّحۡمَٰنِ ٱلرَّحِيمِ',
+                  // Simplified versions
                   'بسم الله الرحمن الرحيم ',
-                  'بسم الله الرحمن الرحيم'
+                  'بسم الله الرحمن الرحيم',
+                  // Alternative forms
+                  'بِسْمِ اللهِ الرَّحْمنِ الرَّحِيمِ ',
+                  'بِسْمِ اللهِ الرَّحْمنِ الرَّحِيمِ',
+                  'بِسْمِ اللّٰهِ الرَّحْمٰنِ الرَّحِيْمِ ',
+                  'بِسْمِ اللّٰهِ الرَّحْمٰنِ الرَّحِيْمِ',
+                  // With different spacing
+                  'بِسْمِ  اللَّهِ  الرَّحْمَٰنِ  الرَّحِيمِ ',
+                  'بِسْمِ  اللَّهِ  الرَّحْمَٰنِ  الرَّحِيمِ'
                 ];
                 
                 let bismillahRemoved = false;
@@ -125,11 +137,17 @@ class QuranApiService {
                   }
                 }
                 
-                // Step 2: If exact matching fails, use regex patterns
+                // Method 2: Advanced regex patterns for variations
                 if (!bismillahRemoved) {
                   const regexPatterns = [
+                    // Ultra-comprehensive regex for all Bismillah variations
                     /^\s*بِسۡ?ْمِ\s+[اٱ]للَّ?ّٰ?هِ\s+[اٱ]لرَّحۡ?ْمَ?ٰ?نِ\s+[اٱ]لرَّحِيۡ?مِ\s*/u,
-                    /^\s*بسم\s+الله\s+الرحمن\s+الرحيم\s*/u
+                    // Simplified version
+                    /^\s*بسم\s+الله\s+الرحمن\s+الرحيم\s*/u,
+                    // With optional diacritics
+                    /^\s*بِسْمِ\s*اللَّ?هِ\s*الرَّحْمَ?ٰ?نِ\s*الرَّحِيمِ\s*/u,
+                    // Catch-all for any Arabic text starting with بسم
+                    /^\s*بسم[\u0600-\u06FF\s]{15,35}\s*/u
                   ];
                   
                   for (const regex of regexPatterns) {
@@ -143,29 +161,43 @@ class QuranApiService {
                   }
                 }
                 
-                // Step 3: NUCLEAR OPTION - If text is suspiciously long, force remove first part
-                if (!bismillahRemoved && originalText.length > 80) {
-                  // Check if text contains Bismillah indicators
-                  const hasBismillahIndicators = originalText.includes('بسم') || originalText.includes('بِسْمِ') || 
-                    (originalText.includes('الله') && originalText.includes('الرحمن'));
+                // Method 3: Word-based removal (if text contains Bismillah keywords)
+                if (!bismillahRemoved && originalText.length > 50) {
+                  const containsBismillahKeywords = (
+                    (originalText.includes('بسم') || originalText.includes('بِسْمِ')) &&
+                    (originalText.includes('الله') || originalText.includes('اللَّهِ')) &&
+                    (originalText.includes('الرحمن') || originalText.includes('الرَّحْمَٰنِ')) &&
+                    (originalText.includes('الرحيم') || originalText.includes('الرَّحِيمِ'))
+                  );
                   
-                  if (hasBismillahIndicators) {
-                    // Force remove first 19 characters (approximate length of Bismillah)
-                    // This is aggressive but ensures no Bismillah duplication
+                  if (containsBismillahKeywords) {
                     const words = originalText.split(/\s+/);
                     if (words.length > 6) {
-                      // Remove first 4-6 words which should cover any Bismillah variation
+                      // Remove first 4 words (standard Bismillah length)
                       ayahText = words.slice(4).join(' ').trim();
-                      console.log(`🚨 [AlQuran.cloud] NUCLEAR: Force-removed first 4 words from Surah ${surahNumber}, Ayah 1`);
+                      console.log(`🔧 [AlQuran.cloud] Word-based removal from Surah ${surahNumber}, Ayah 1`);
                       bismillahRemoved = true;
                     }
                   }
                 }
                 
-                // Final validation
+                // Method 4: Character-based removal (last resort)
+                if (!bismillahRemoved && originalText.length > 80) {
+                  // If text is very long and likely contains Bismillah, remove first ~19 characters
+                  const potentialBismillah = originalText.substring(0, 25);
+                  if (potentialBismillah.includes('بسم') || potentialBismillah.includes('بِسْمِ')) {
+                    ayahText = originalText.substring(19).trim();
+                    console.log(`🚨 [AlQuran.cloud] Character-based removal from Surah ${surahNumber}, Ayah 1`);
+                    bismillahRemoved = true;
+                  }
+                }
+                
+                // Final validation and logging
                 if (bismillahRemoved && ayahText.length > 0 && ayahText !== originalText) {
                   console.log(`✅ [AlQuran.cloud] Successfully cleaned Surah ${surahNumber}, Ayah 1. Original: ${originalText.length} chars, New: ${ayahText.length} chars`);
-                } else if (originalText.length > 50) {
+                  console.log(`   Original start: "${originalText.substring(0, 50)}..."`);
+                  console.log(`   Cleaned start: "${ayahText.substring(0, 50)}..."`);
+                } else if (originalText.length > 30) {
                   console.warn(`⚠️ [AlQuran.cloud] Could not remove Bismillah from Surah ${surahNumber}, Ayah 1. Text: "${originalText.substring(0, 100)}..."`);
                 }
               }
