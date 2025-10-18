@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Privacy Policy - Al-Quran Pro</title>
+<title>Privacy Policy - Complete Quran</title>
 <style>
   body {
     font-family: "Segoe UI", Arial, sans-serif;
@@ -113,7 +113,7 @@
 </ul>
 
 <footer>
-  <p>© <span id="year"></span> Al-Quran Pro. All rights reserved.</p>
+  <p>© <span id="year"></span> Complete Quran. All rights reserved.</p>
 </footer>
 
 <script>
@@ -122,3 +122,4 @@
 
 </body>
 </html>
+
