@@ -598,7 +598,7 @@ export default function SearchScreen() {
   }, []);
 
   const searchMutation = trpc.quran.search.useMutation({
-    onSuccess: async (data) => {
+    onSuccess: async (data: any) => {
       try {
         console.log('Search API response:', data);
         const enhancedResults = await enhanceSearchResults(data || [], searchQuery);
@@ -616,7 +616,7 @@ export default function SearchScreen() {
         Alert.alert('Search Error', 'Failed to process search results. Please try again.');
       }
     },
-    onError: async (error) => {
+    onError: async (error: any) => {
       console.error('Search error:', error);
       
       // Try offline search as fallback
